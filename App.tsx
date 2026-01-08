@@ -15,8 +15,8 @@ const App: React.FC = () => {
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Set default tab to 'portal' so the user sees the requested widgets immediately
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('portal');
+  // Set default tab to 'dashboard' as requested
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
 
   useEffect(() => {
     const unsubscribe = dbService.subscribeToStatus((status) => {
