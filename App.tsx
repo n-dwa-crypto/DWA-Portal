@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { dbService } from './services/mockDb';
 import { ConnectionStatus, DbRecord, RecordType, SystemStats } from './types';
@@ -5,7 +6,7 @@ import { DbStatus } from './components/DbStatus';
 import { ActionWidget } from './components/ActionWidget';
 import { Feed } from './components/Feed';
 import { Dashboard } from './components/Dashboard';
-import { LayoutDashboard, History, Menu, X, Shield, Activity, Home, PenTool } from 'lucide-react';
+import { LayoutDashboard, History, Menu, X, Shield, Activity, Home } from 'lucide-react';
 
 const App: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
@@ -14,8 +15,8 @@ const App: React.FC = () => {
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Updated routing state to include 'dashboard' (analytics) and 'portal' (actions)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
+  // Set default tab to 'portal' so the user sees the requested widgets immediately
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('portal');
 
   useEffect(() => {
     const unsubscribe = dbService.subscribeToStatus((status) => {
@@ -73,7 +74,7 @@ const App: React.FC = () => {
         fixed md:relative inset-0 z-40 
         md:w-72 md:bg-black/10 md:backdrop-blur-xl md:border-r md:border-white/5
         bg-black/80 backdrop-blur-xl
-        transform transition-transform duration-500 cubic-bezier(0.32, 0.72, 0, 1) flex flex-col
+        transform transition-transform duration-500 flex flex-col
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="p-8 hidden md:flex items-center gap-4 mb-4">
@@ -101,7 +102,7 @@ const App: React.FC = () => {
 
           <button 
             onClick={() => { setActiveTab('portal'); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group ${
+            className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group relative ${
               activeTab === 'portal' 
               ? 'bg-white/10 text-white shadow-lg backdrop-blur-md ring-1 ring-white/10' 
               : 'text-slate-400 hover:bg-white/5 hover:text-white'
@@ -157,11 +158,6 @@ const App: React.FC = () => {
            </div>
            <DbStatus status={connectionStatus} lastSync={stats.lastSync} />
         </header>
-
-        {/* Mobile Status */}
-        <div className="md:hidden p-4 pb-0 flex justify-center">
-             <DbStatus status={connectionStatus} lastSync={stats.lastSync} />
-        </div>
 
         {/* Scrollable Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-10 scroll-smooth">
