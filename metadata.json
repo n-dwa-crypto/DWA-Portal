@@ -1,0 +1,5 @@
+{
+  "name": "DWA Portal",
+  "description": "A responsive admin portal for managing Crypto News and Sanctions with real-time DB connection monitoring and AI-assisted content drafting.",
+  "requestFramePermissions": []
+}
