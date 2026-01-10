@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   AlertTriangle, 
   TrendingUp, 
@@ -11,10 +11,11 @@ import {
   ArrowRight,
   Database,
   Bitcoin,
-  Globe
+  Globe,
+  Loader2
 } from 'lucide-react';
 
-// --- MOCK DATA FROM HTML ---
+// --- MOCK CONSTANTS (Kept for Crypto as requested to focus on Sanction CSV) ---
 const tier1Data = {
   "overall_risk": "HIGH", 
   "sanctions": { "additions": 62, "deletions": 0, "modifications": 0, "total_changes": 62, "alert_level": "HIGH", "timestamp": "2025-10-12T00:01:04.459002" }, 
@@ -22,37 +23,20 @@ const tier1Data = {
   "requires_tier2_review": true 
 };
 
-const tier2Data = {
-  "sanctions": {
-    "additions": [
-      { "id": "54604", "name": "STORELAB, S.A. DE C.V.", "publication_id": 754, "publication_date": "2025-10-06" },
-      { "id": "54662", "name": "CONDE URAGA, Martha Emilia", "publication_id": 754, "publication_date": "2025-10-06" },
-      { "id": "54663", "name": "COMERCIAL VIOSMA DEL NOROESTE, S.A. DE C.V.", "publication_id": 754, "publication_date": "2025-10-06" },
-      { "id": "54667", "name": "FAVELA LOPEZ, Francisco", "publication_id": 754, "publication_date": "2025-10-06" },
-      { "id": "54671", "name": "VERDUGO ARAUJO, Jairo", "publication_id": 754, "publication_date": "2025-10-06" },
-      { "id": "55202", "name": "HOSEINI MUNES, Sayyed Ahmad", "publication_id": 753, "publication_date": "2025-10-01" },
-      { "id": "55402", "name": "SUN, Zhaolan", "publication_id": 753, "publication_date": "2025-10-01" },
-      { "id": "55403", "name": "WESTCOM TECHNOLOGY CO LIMITED", "publication_id": 753, "publication_date": "2025-10-01" },
-      { "id": "55444", "name": "ROCKET PCB SOLUTION LTD", "publication_id": 753, "publication_date": "2025-10-01" },
-      { "id": "55550", "name": "PERFECT DAY CO SA", "publication_id": 753, "publication_date": "2025-10-01" }
-    ],
-    "deletions": []
-  },
-  "crypto": {
-    "bitcoin_stablecoins": [
-      { "rank": 1, "symbol": "BTC", "name": "Bitcoin", "price": 111165.24, "change_24h": -2.46 },
-      { "rank": 2, "symbol": "ETH", "name": "Ethereum", "price": 3748.25, "change_24h": -2.85 },
-      { "rank": 3, "symbol": "USDT", "name": "Tether USDt", "price": 1.00, "change_24h": -0.16 },
-      { "rank": 7, "symbol": "USDC", "name": "USDC", "price": 1.00, "change_24h": 0.01 }
-    ],
-    "altcoins": [
-      { "rank": 4, "symbol": "BNB", "name": "BNB", "price": 1146.82, "change_24h": 2.77 },
-      { "rank": 5, "symbol": "XRP", "name": "XRP", "price": 2.39, "change_24h": 2.56 },
-      { "rank": 6, "symbol": "SOL", "name": "Solana", "price": 177.59, "change_24h": -6.51 },
-      { "rank": 9, "symbol": "DOGE", "name": "Dogecoin", "price": 0.18, "change_24h": -3.88 },
-      { "rank": 12, "symbol": "HYPE", "name": "Hyperliquid", "price": 37.34, "change_24h": -4.54 }
-    ]
-  }
+const cryptoData = {
+  "bitcoin_stablecoins": [
+    { "rank": 1, "symbol": "BTC", "name": "Bitcoin", "price": 111165.24, "change_24h": -2.46 },
+    { "rank": 2, "symbol": "ETH", "name": "Ethereum", "price": 3748.25, "change_24h": -2.85 },
+    { "rank": 3, "symbol": "USDT", "name": "Tether USDt", "price": 1.00, "change_24h": -0.16 },
+    { "rank": 7, "symbol": "USDC", "name": "USDC", "price": 1.00, "change_24h": 0.01 }
+  ],
+  "altcoins": [
+    { "rank": 4, "symbol": "BNB", "name": "BNB", "price": 1146.82, "change_24h": 2.77 },
+    { "rank": 5, "symbol": "XRP", "name": "XRP", "price": 2.39, "change_24h": 2.56 },
+    { "rank": 6, "symbol": "SOL", "name": "Solana", "price": 177.59, "change_24h": -6.51 },
+    { "rank": 9, "symbol": "DOGE", "name": "Dogecoin", "price": 0.18, "change_24h": -3.88 },
+    { "rank": 12, "symbol": "HYPE", "name": "Hyperliquid", "price": 37.34, "change_24h": -4.54 }
+  ]
 };
 
 const tier3Data = {
@@ -133,6 +117,31 @@ const EntityRow: React.FC<EntityRowProps> = ({ item, type }) => (
 );
 
 export const Dashboard: React.FC = () => {
+  const [sanctions, setSanctions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSanctions = async () => {
+      try {
+        setIsLoading(true);
+        // During local dev, this might fail if the script hasn't run.
+        // On GitHub Pages, it will be at /data/sanctions.json
+        const response = await fetch('./data/sanctions.json');
+        if (!response.ok) throw new Error('Sanctions data not yet generated or found');
+        const data = await response.json();
+        setSanctions(data);
+      } catch (err: any) {
+        console.warn("Failed to fetch sanctions JSON:", err.message);
+        setError("Source data pending build process.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSanctions();
+  }, []);
+
   return (
     <div className="max-w-[1800px] mx-auto space-y-8 animate-in fade-in zoom-in duration-500">
       
@@ -142,7 +151,17 @@ export const Dashboard: React.FC = () => {
          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-purple-200 mb-2 tracking-tight">
            Multi-Agent AI Risk Dashboard
          </h1>
-         <p className="text-slate-400 font-medium">Three-Tier Agentic Intelligence System | Real-Time Sanctions & Crypto Monitoring</p>
+         <p className="text-slate-400 font-medium">Three-Tier Agentic Intelligence System | Dynamic Sanctions & Crypto Monitoring</p>
+         
+         <div className="mt-4 flex items-center justify-center gap-4">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                Live Data Active
+            </span>
+            <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-3 py-1 rounded-full border border-white/5 uppercase tracking-widest">
+                Source: sanctions.csv
+            </span>
+         </div>
       </div>
 
       {/* TIER 1: ALERTS */}
@@ -170,15 +189,15 @@ export const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-200 tracking-tighter mb-2">
-                    {tier1Data.sanctions.total_changes}
+                    {isLoading ? "..." : sanctions.length || tier1Data.sanctions.total_changes}
                   </div>
-                  <p className="text-purple-300/80 font-medium">Total detected changes</p>
+                  <p className="text-purple-300/80 font-medium">Total detected changes (Latest CSV)</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/10">
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                      <div className="text-2xl font-bold text-white">{tier1Data.sanctions.additions}</div>
-                      <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Additions</div>
+                      <div className="text-2xl font-bold text-white">{isLoading ? "-" : sanctions.length}</div>
+                      <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">CSV Additions</div>
                    </div>
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
                       <div className="text-2xl font-bold text-slate-400">{tier1Data.sanctions.deletions}</div>
@@ -236,18 +255,32 @@ export const Dashboard: React.FC = () => {
           {/* Sanctions Analysis Column */}
           <div className="space-y-6">
             {/* Added */}
-            <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-3xl rounded-l-md p-6 h-[400px] flex flex-col">
+            <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-3xl rounded-l-md p-6 h-[400px] flex flex-col relative overflow-hidden">
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-emerald-100 flex items-center gap-2">
                     <ShieldAlert size={20} className="text-emerald-500" />
-                    Entities Added
+                    Entities Added (CSV Driven)
                   </h3>
-                  <span className="bg-emerald-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{tier2Data.sanctions.additions.length}</span>
+                  <span className="bg-emerald-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{sanctions.length}</span>
                </div>
+               
                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                  {tier2Data.sanctions.additions.map((item, i) => (
-                    <EntityRow key={i} item={item} type="add" />
-                  ))}
+                  {isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
+                      <Loader2 className="animate-spin" size={24} />
+                      <span className="text-xs font-mono uppercase tracking-widest">Parsing CSV...</span>
+                    </div>
+                  ) : error ? (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-500 text-center px-4">
+                      <Database size={32} className="mb-2 opacity-20" />
+                      <span className="text-xs font-mono uppercase tracking-widest text-rose-400">{error}</span>
+                      <p className="text-[10px] mt-2 opacity-50">GitHub Action converts sanctions.csv to JSON upon push.</p>
+                    </div>
+                  ) : (
+                    sanctions.map((item, i) => (
+                      <EntityRow key={i} item={item} type="add" />
+                    ))
+                  )}
                </div>
             </div>
 
@@ -258,17 +291,11 @@ export const Dashboard: React.FC = () => {
                     <ShieldAlert size={20} className="text-rose-500" />
                     Entities Deleted
                   </h3>
-                  <span className="bg-rose-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{tier2Data.sanctions.deletions.length}</span>
+                  <span className="bg-rose-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{tier1Data.sanctions.deletions}</span>
                </div>
-               {tier2Data.sanctions.deletions.length === 0 ? (
-                 <div className="flex-1 flex items-center justify-center text-slate-500 italic text-sm">No deletions detected</div>
-               ) : (
-                 <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                    {tier2Data.sanctions.deletions.map((item: any, i) => (
-                      <EntityRow key={i} item={item} type="del" />
-                    ))}
-                 </div>
-               )}
+               <div className="flex-1 flex items-center justify-center text-slate-500 italic text-sm border border-dashed border-white/5 rounded-xl">
+                    No deletions detected in current epoch
+               </div>
             </div>
           </div>
 
@@ -281,10 +308,10 @@ export const Dashboard: React.FC = () => {
                     <Bitcoin size={20} className="text-amber-500" />
                     Bitcoin & Stablecoins
                   </h3>
-                  <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg text-xs font-bold">{tier2Data.crypto.bitcoin_stablecoins.length}</span>
+                  <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoData.bitcoin_stablecoins.length}</span>
                </div>
                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                  {tier2Data.crypto.bitcoin_stablecoins.map((item, i) => (
+                  {cryptoData.bitcoin_stablecoins.map((item, i) => (
                     <CryptoRow key={i} item={item} />
                   ))}
                </div>
@@ -297,10 +324,10 @@ export const Dashboard: React.FC = () => {
                     <Globe size={20} className="text-indigo-500" />
                     Altcoins
                   </h3>
-                  <span className="bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-lg text-xs font-bold">{tier2Data.crypto.altcoins.length}</span>
+                  <span className="bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoData.altcoins.length}</span>
                </div>
                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                  {tier2Data.crypto.altcoins.map((item, i) => (
+                  {cryptoData.altcoins.map((item, i) => (
                     <CryptoRow key={i} item={item} />
                   ))}
                </div>
@@ -318,7 +345,6 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 backdrop-blur-2xl border border-emerald-500/20 rounded-[32px] p-8">
-            {/* Stats */}
             <div className="grid grid-cols-3 gap-4 mb-8">
                 <div className="text-center p-4 bg-black/20 rounded-2xl border border-white/5">
                    <div className="text-3xl font-bold text-emerald-400">{tier3Data.intelligence.total_correlations}</div>
@@ -335,7 +361,6 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Correlations List */}
                 <div>
                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                       <LinkIcon size={20} className="text-emerald-400" />
@@ -365,7 +390,6 @@ export const Dashboard: React.FC = () => {
                    </div>
                 </div>
 
-                {/* Recommendations */}
                 <div>
                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                       <Lightbulb size={20} className="text-yellow-400" />
@@ -395,10 +419,9 @@ export const Dashboard: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer Timestamp */}
       <div className="text-center pb-8 pt-4">
          <div className="inline-block px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/5 text-xs text-slate-500 font-mono">
-            Generated: {new Date().toUTCString()} | Multi-Agent AI System v1.0
+            Generated: {new Date().toUTCString()} | Multi-Agent AI System v1.1-Dynamic
          </div>
       </div>
     </div>

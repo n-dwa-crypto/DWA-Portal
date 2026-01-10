@@ -1,4 +1,3 @@
-
 name: Deploy to GitHub Pages
 
 on:
@@ -18,6 +17,8 @@ jobs:
       - name: Install and Build 🔧
         run: |
           npm install
+          # Run CSV conversion before building the site
+          node scripts/csv-to-json.js
           npm run build
 
       - name: Deploy 🚀
