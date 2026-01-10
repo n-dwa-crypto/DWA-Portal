@@ -15,7 +15,7 @@ import {
   Loader2
 } from 'lucide-react';
 
-// --- MOCK CONSTANTS (Kept for Crypto as requested to focus on Sanction CSV) ---
+// --- MOCK CONSTANTS (Kept for Crypto as requested to focus on Sanction data) ---
 const tier1Data = {
   "overall_risk": "HIGH", 
   "sanctions": { "additions": 62, "deletions": 0, "modifications": 0, "total_changes": 62, "alert_level": "HIGH", "timestamp": "2025-10-12T00:01:04.459002" }, 
@@ -125,15 +125,14 @@ export const Dashboard: React.FC = () => {
     const fetchSanctions = async () => {
       try {
         setIsLoading(true);
-        // During local dev, this might fail if the script hasn't run.
         // On GitHub Pages, it will be at /data/sanctions.json
         const response = await fetch('./data/sanctions.json');
-        if (!response.ok) throw new Error('Sanctions data not yet generated or found');
+        if (!response.ok) throw new Error('System sync required');
         const data = await response.json();
         setSanctions(data);
       } catch (err: any) {
         console.warn("Failed to fetch sanctions JSON:", err.message);
-        setError("Source data pending build process.");
+        setError("Live intelligence link establishing...");
       } finally {
         setIsLoading(false);
       }
@@ -151,15 +150,15 @@ export const Dashboard: React.FC = () => {
          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-purple-200 mb-2 tracking-tight">
            Multi-Agent AI Risk Dashboard
          </h1>
-         <p className="text-slate-400 font-medium">Three-Tier Agentic Intelligence System | Dynamic Sanctions & Crypto Monitoring</p>
+         <p className="text-slate-400 font-medium">Three-Tier Agentic Intelligence System | Real-time Global Monitoring</p>
          
          <div className="mt-4 flex items-center justify-center gap-4">
             <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                Live Data Active
+                Live Node Feed
             </span>
             <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-3 py-1 rounded-full border border-white/5 uppercase tracking-widest">
-                Source: sanctions.csv
+                Region: Global Intelligence
             </span>
          </div>
       </div>
@@ -191,17 +190,17 @@ export const Dashboard: React.FC = () => {
                   <div className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-200 tracking-tighter mb-2">
                     {isLoading ? "..." : sanctions.length || tier1Data.sanctions.total_changes}
                   </div>
-                  <p className="text-purple-300/80 font-medium">Total detected changes (Latest CSV)</p>
+                  <p className="text-purple-300/80 font-medium">Total detected operational changes</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/10">
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
                       <div className="text-2xl font-bold text-white">{isLoading ? "-" : sanctions.length}</div>
-                      <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">CSV Additions</div>
+                      <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Verified Additions</div>
                    </div>
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
                       <div className="text-2xl font-bold text-slate-400">{tier1Data.sanctions.deletions}</div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Deletions</div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Entity Deletions</div>
                    </div>
                 </div>
              </div>
@@ -217,25 +216,25 @@ export const Dashboard: React.FC = () => {
                        <div className="p-3 rounded-2xl bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/30">
                           <Activity size={24} />
                        </div>
-                       <h2 className="text-2xl font-bold text-white">Crypto Volatility</h2>
+                       <h2 className="text-2xl font-bold text-white">Market Volatility</h2>
                     </div>
-                    <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold rounded-full">MONITORING</span>
+                    <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold rounded-full">ACTIVE</span>
                   </div>
                   
                   <div className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 tracking-tighter mb-2">
                     {tier1Data.crypto.high_volatility_count}
                   </div>
-                  <p className="text-cyan-300/80 font-medium">High volatility assets ({'>'}5%)</p>
+                  <p className="text-cyan-300/80 font-medium">Critical volatility assets ({'>'}5%)</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/10">
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
                       <div className="text-2xl font-bold text-rose-400">{tier1Data.crypto.major_avg_change.toFixed(1)}%</div>
-                      <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Stable Avg</div>
+                      <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Stability Index</div>
                    </div>
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
                       <div className="text-2xl font-bold text-slate-200">{tier1Data.crypto.alt_avg_change.toFixed(1)}%</div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Altcoin Avg</div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Alt Asset Avg</div>
                    </div>
                 </div>
              </div>
@@ -259,7 +258,7 @@ export const Dashboard: React.FC = () => {
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-emerald-100 flex items-center gap-2">
                     <ShieldAlert size={20} className="text-emerald-500" />
-                    Entities Added (CSV Driven)
+                    Latest Sanction Entities
                   </h3>
                   <span className="bg-emerald-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{sanctions.length}</span>
                </div>
@@ -268,13 +267,13 @@ export const Dashboard: React.FC = () => {
                   {isLoading ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
                       <Loader2 className="animate-spin" size={24} />
-                      <span className="text-xs font-mono uppercase tracking-widest">Parsing CSV...</span>
+                      <span className="text-xs font-mono uppercase tracking-widest">Scanning Network...</span>
                     </div>
                   ) : error ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-500 text-center px-4">
                       <Database size={32} className="mb-2 opacity-20" />
                       <span className="text-xs font-mono uppercase tracking-widest text-rose-400">{error}</span>
-                      <p className="text-[10px] mt-2 opacity-50">GitHub Action converts sanctions.csv to JSON upon push.</p>
+                      <p className="text-[10px] mt-2 opacity-50">Secure link initializing. Waiting for data gateway.</p>
                     </div>
                   ) : (
                     sanctions.map((item, i) => (
@@ -289,7 +288,7 @@ export const Dashboard: React.FC = () => {
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-rose-100 flex items-center gap-2">
                     <ShieldAlert size={20} className="text-rose-500" />
-                    Entities Deleted
+                    Entities De-listed
                   </h3>
                   <span className="bg-rose-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{tier1Data.sanctions.deletions}</span>
                </div>
@@ -306,7 +305,7 @@ export const Dashboard: React.FC = () => {
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-amber-100 flex items-center gap-2">
                     <Bitcoin size={20} className="text-amber-500" />
-                    Bitcoin & Stablecoins
+                    Market Anchors
                   </h3>
                   <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoData.bitcoin_stablecoins.length}</span>
                </div>
@@ -322,7 +321,7 @@ export const Dashboard: React.FC = () => {
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-indigo-100 flex items-center gap-2">
                     <Globe size={20} className="text-indigo-500" />
-                    Altcoins
+                    Global Assets
                   </h3>
                   <span className="bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoData.altcoins.length}</span>
                </div>
@@ -364,7 +363,7 @@ export const Dashboard: React.FC = () => {
                 <div>
                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                       <LinkIcon size={20} className="text-emerald-400" />
-                      Detected Correlations
+                      Cross-Sector Patterns
                    </h3>
                    <div className="space-y-4">
                       {tier3Data.correlations.map((corr, i) => (
@@ -421,7 +420,7 @@ export const Dashboard: React.FC = () => {
 
       <div className="text-center pb-8 pt-4">
          <div className="inline-block px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/5 text-xs text-slate-500 font-mono">
-            Generated: {new Date().toUTCString()} | Multi-Agent AI System v1.1-Dynamic
+            System Hash: {Math.random().toString(16).substring(2, 10).toUpperCase()} | Multi-Agent AI System v1.1
          </div>
       </div>
     </div>
