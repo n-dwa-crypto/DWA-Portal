@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  AlertTriangle, 
   TrendingUp, 
   TrendingDown, 
   Activity, 
@@ -15,30 +14,7 @@ import {
   Loader2
 } from 'lucide-react';
 
-// --- MOCK CONSTANTS (Kept for Crypto as requested to focus on Sanction data) ---
-const tier1Data = {
-  "overall_risk": "HIGH", 
-  "sanctions": { "additions": 62, "deletions": 0, "modifications": 0, "total_changes": 62, "alert_level": "HIGH", "timestamp": "2025-10-12T00:01:04.459002" }, 
-  "crypto": { "high_volatility_count": 1, "high_volatility_coins": [{ "symbol": "SOL", "name": "Solana", "change": -6.51223793 }], "stable_avg_change": -0.08075965, "major_avg_change": -2.65817828, "alt_avg_change": -0.47547790636363646, "alert_level": "NORMAL" }, 
-  "requires_tier2_review": true 
-};
-
-const cryptoData = {
-  "bitcoin_stablecoins": [
-    { "rank": 1, "symbol": "BTC", "name": "Bitcoin", "price": 111165.24, "change_24h": -2.46 },
-    { "rank": 2, "symbol": "ETH", "name": "Ethereum", "price": 3748.25, "change_24h": -2.85 },
-    { "rank": 3, "symbol": "USDT", "name": "Tether USDt", "price": 1.00, "change_24h": -0.16 },
-    { "rank": 7, "symbol": "USDC", "name": "USDC", "price": 1.00, "change_24h": 0.01 }
-  ],
-  "altcoins": [
-    { "rank": 4, "symbol": "BNB", "name": "BNB", "price": 1146.82, "change_24h": 2.77 },
-    { "rank": 5, "symbol": "XRP", "name": "XRP", "price": 2.39, "change_24h": 2.56 },
-    { "rank": 6, "symbol": "SOL", "name": "Solana", "price": 177.59, "change_24h": -6.51 },
-    { "rank": 9, "symbol": "DOGE", "name": "Dogecoin", "price": 0.18, "change_24h": -3.88 },
-    { "rank": 12, "symbol": "HYPE", "name": "Hyperliquid", "price": 37.34, "change_24h": -4.54 }
-  ]
-};
-
+// --- TIER 3 MOCK DATA (High-level insights) ---
 const tier3Data = {
   "correlations": [
     { 
@@ -118,28 +94,50 @@ const EntityRow: React.FC<EntityRowProps> = ({ item, type }) => (
 
 export const Dashboard: React.FC = () => {
   const [sanctions, setSanctions] = useState<any[]>([]);
+  const [cryptoStable, setCryptoStable] = useState<any[]>([]);
+  const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchSanctions = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        // On GitHub Pages, it will be at /data/sanctions.json
-        const response = await fetch('./data/sanctions.json');
-        if (!response.ok) throw new Error('System sync required');
-        const data = await response.json();
-        setSanctions(data);
+        const [sanctionsRes, stableRes, altRes] = await Promise.all([
+          fetch('./data/sanctions.json'),
+          fetch('./data/crypto_stable.json'),
+          fetch('./data/crypto_alt.json')
+        ]);
+
+        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) {
+          throw new Error('System sync required');
+        }
+
+        const [sanctionsData, stableData, altData] = await Promise.all([
+          sanctionsRes.json(),
+          stableRes.json(),
+          altRes.json()
+        ]);
+
+        setSanctions(sanctionsData);
+        setCryptoStable(stableData);
+        setCryptoAlt(altData);
       } catch (err: any) {
-        console.warn("Failed to fetch sanctions JSON:", err.message);
-        setError("Live intelligence link establishing...");
+        console.warn("Failed to fetch JSON data:", err.message);
+        setError("Initializing data intelligence nodes...");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchSanctions();
+    fetchData();
   }, []);
+
+  // Calculate dynamic stats from the data
+  const allCrypto = [...cryptoStable, ...cryptoAlt];
+  const highVolatilityCount = allCrypto.filter(c => Math.abs(c.change_24h) > 5).length;
+  const stableAvgChange = cryptoStable.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoStable.length || 1);
+  const altAvgChange = cryptoAlt.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoAlt.length || 1);
 
   return (
     <div className="max-w-[1800px] mx-auto space-y-8 animate-in fade-in zoom-in duration-500">
@@ -158,7 +156,7 @@ export const Dashboard: React.FC = () => {
                 Live Node Feed
             </span>
             <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-3 py-1 rounded-full border border-white/5 uppercase tracking-widest">
-                Region: Global Intelligence
+                Nodes: Sanctions | Stable | Alts
             </span>
          </div>
       </div>
@@ -188,7 +186,7 @@ export const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-200 tracking-tighter mb-2">
-                    {isLoading ? "..." : sanctions.length || tier1Data.sanctions.total_changes}
+                    {isLoading ? "..." : sanctions.length}
                   </div>
                   <p className="text-purple-300/80 font-medium">Total detected operational changes</p>
                 </div>
@@ -199,7 +197,7 @@ export const Dashboard: React.FC = () => {
                       <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Verified Additions</div>
                    </div>
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                      <div className="text-2xl font-bold text-slate-400">{tier1Data.sanctions.deletions}</div>
+                      <div className="text-2xl font-bold text-slate-400">0</div>
                       <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Entity Deletions</div>
                    </div>
                 </div>
@@ -222,18 +220,22 @@ export const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 tracking-tighter mb-2">
-                    {tier1Data.crypto.high_volatility_count}
+                    {isLoading ? "..." : highVolatilityCount}
                   </div>
                   <p className="text-cyan-300/80 font-medium">Critical volatility assets ({'>'}5%)</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/10">
-                   <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                      <div className="text-2xl font-bold text-rose-400">{tier1Data.crypto.major_avg_change.toFixed(1)}%</div>
+                   <div className={`bg-white/5 rounded-2xl p-4 text-center border border-white/5`}>
+                      <div className={`text-2xl font-bold ${stableAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {isLoading ? "-" : `${stableAvgChange.toFixed(1)}%`}
+                      </div>
                       <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Stability Index</div>
                    </div>
                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                      <div className="text-2xl font-bold text-slate-200">{tier1Data.crypto.alt_avg_change.toFixed(1)}%</div>
+                      <div className={`text-2xl font-bold ${altAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {isLoading ? "-" : `${altAvgChange.toFixed(1)}%`}
+                      </div>
                       <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Alt Asset Avg</div>
                    </div>
                 </div>
@@ -253,8 +255,7 @@ export const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
           {/* Sanctions Analysis Column */}
           <div className="space-y-6">
-            {/* Added */}
-            <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-3xl rounded-l-md p-6 h-[400px] flex flex-col relative overflow-hidden">
+            <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-3xl rounded-l-md p-6 h-[624px] flex flex-col relative overflow-hidden">
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-emerald-100 flex items-center gap-2">
                     <ShieldAlert size={20} className="text-emerald-500" />
@@ -273,27 +274,13 @@ export const Dashboard: React.FC = () => {
                     <div className="flex flex-col items-center justify-center h-full text-slate-500 text-center px-4">
                       <Database size={32} className="mb-2 opacity-20" />
                       <span className="text-xs font-mono uppercase tracking-widest text-rose-400">{error}</span>
-                      <p className="text-[10px] mt-2 opacity-50">Secure link initializing. Waiting for data gateway.</p>
+                      <p className="text-[10px] mt-2 opacity-50">Link initializing. Check source CSV status.</p>
                     </div>
                   ) : (
                     sanctions.map((item, i) => (
                       <EntityRow key={i} item={item} type="add" />
                     ))
                   )}
-               </div>
-            </div>
-
-            {/* Deleted */}
-            <div className="bg-black/30 backdrop-blur-xl border-l-4 border-rose-500 rounded-r-3xl rounded-l-md p-6 h-[200px] flex flex-col">
-               <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-lg text-rose-100 flex items-center gap-2">
-                    <ShieldAlert size={20} className="text-rose-500" />
-                    Entities De-listed
-                  </h3>
-                  <span className="bg-rose-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{tier1Data.sanctions.deletions}</span>
-               </div>
-               <div className="flex-1 flex items-center justify-center text-slate-500 italic text-sm border border-dashed border-white/5 rounded-xl">
-                    No deletions detected in current epoch
                </div>
             </div>
           </div>
@@ -305,14 +292,20 @@ export const Dashboard: React.FC = () => {
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-amber-100 flex items-center gap-2">
                     <Bitcoin size={20} className="text-amber-500" />
-                    Market Anchors
+                    Bitcoin & Stablecoins
                   </h3>
-                  <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoData.bitcoin_stablecoins.length}</span>
+                  <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoStable.length}</span>
                </div>
                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                  {cryptoData.bitcoin_stablecoins.map((item, i) => (
-                    <CryptoRow key={i} item={item} />
-                  ))}
+                  {isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
+                      <Loader2 className="animate-spin" size={16} />
+                    </div>
+                  ) : (
+                    cryptoStable.map((item, i) => (
+                      <CryptoRow key={i} item={item} />
+                    ))
+                  )}
                </div>
             </div>
 
@@ -321,14 +314,20 @@ export const Dashboard: React.FC = () => {
                <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-indigo-100 flex items-center gap-2">
                     <Globe size={20} className="text-indigo-500" />
-                    Global Assets
+                    Altcoins
                   </h3>
-                  <span className="bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoData.altcoins.length}</span>
+                  <span className="bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-lg text-xs font-bold">{cryptoAlt.length}</span>
                </div>
                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                  {cryptoData.altcoins.map((item, i) => (
-                    <CryptoRow key={i} item={item} />
-                  ))}
+                  {isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
+                      <Loader2 className="animate-spin" size={16} />
+                    </div>
+                  ) : (
+                    cryptoAlt.map((item, i) => (
+                      <CryptoRow key={i} item={item} />
+                    ))
+                  )}
                </div>
             </div>
           </div>
@@ -420,7 +419,7 @@ export const Dashboard: React.FC = () => {
 
       <div className="text-center pb-8 pt-4">
          <div className="inline-block px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/5 text-xs text-slate-500 font-mono">
-            System Hash: {Math.random().toString(16).substring(2, 10).toUpperCase()} | Multi-Agent AI System v1.1
+            Generated: {new Date().toUTCString()} | Multi-Agent AI System v1.2
          </div>
       </div>
     </div>
