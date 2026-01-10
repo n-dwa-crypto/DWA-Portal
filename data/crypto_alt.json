@@ -1,0 +1,37 @@
+[
+  {
+    "rank": 4,
+    "symbol": "BNB",
+    "name": "BNB",
+    "price": 1146.82,
+    "change_24h": 2.77
+  },
+  {
+    "rank": 5,
+    "symbol": "XRP",
+    "name": "XRP",
+    "price": 2.39,
+    "change_24h": 2.56
+  },
+  {
+    "rank": 6,
+    "symbol": "SOL",
+    "name": "Solana",
+    "price": 177.59,
+    "change_24h": -6.51
+  },
+  {
+    "rank": 9,
+    "symbol": "DOGE",
+    "name": "Dogecoin",
+    "price": 0.18,
+    "change_24h": -3.88
+  },
+  {
+    "rank": 12,
+    "symbol": "HYPE",
+    "name": "Hyperliquid",
+    "price": 37.34,
+    "change_24h": -4.54
+  }
+]

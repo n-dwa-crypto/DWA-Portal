@@ -1,0 +1,30 @@
+[
+  {
+    "rank": 1,
+    "symbol": "BTC",
+    "name": "Bitcoin",
+    "price": 111165.24,
+    "change_24h": -2.46
+  },
+  {
+    "rank": 2,
+    "symbol": "ETH",
+    "name": "Ethereum",
+    "price": 3748.25,
+    "change_24h": -2.85
+  },
+  {
+    "rank": 3,
+    "symbol": "USDT",
+    "name": "USDt",
+    "price": 1,
+    "change_24h": -0.16
+  },
+  {
+    "rank": 7,
+    "symbol": "USDC",
+    "name": "USDC",
+    "price": 1,
+    "change_24h": 0.01
+  }
+]
