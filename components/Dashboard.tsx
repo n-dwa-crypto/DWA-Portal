@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -11,7 +11,8 @@ import {
   Database,
   Bitcoin,
   Globe,
-  Loader2
+  Loader2,
+  MapPin
 } from 'lucide-react';
 
 // --- TIER 3 MOCK DATA (High-level insights) ---
@@ -75,8 +76,20 @@ interface EntityRowProps {
 const EntityRow: React.FC<EntityRowProps> = ({ item, type }) => (
   <div className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5 group">
     <div className="flex justify-between items-start mb-1">
-       <span className="font-semibold text-sm text-slate-200 line-clamp-1 group-hover:text-white transition-colors">{item.name}</span>
-       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+       <div className="flex items-center gap-2 overflow-hidden">
+          {item.country_code && (
+            <div className="flex items-center gap-1.5 shrink-0 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
+              <img 
+                src={`https://flagcdn.com/w20/${item.country_code.toLowerCase()}.png`} 
+                alt={item.country_code}
+                className="w-4 h-auto rounded-sm object-cover"
+              />
+              <span className="text-[10px] font-mono font-bold text-slate-300">{item.country_code}</span>
+            </div>
+          )}
+          <span className="font-semibold text-sm text-slate-200 line-clamp-1 group-hover:text-white transition-colors">{item.name}</span>
+       </div>
+       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
          type === 'add' 
            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
@@ -134,10 +147,39 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   // Calculate dynamic stats from the data
-  const allCrypto = [...cryptoStable, ...cryptoAlt];
-  const highVolatilityCount = allCrypto.filter(c => Math.abs(c.change_24h) > 5).length;
-  const stableAvgChange = cryptoStable.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoStable.length || 1);
-  const altAvgChange = cryptoAlt.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoAlt.length || 1);
+  const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
+  const highVolatilityCount = useMemo(() => allCrypto.filter(c => Math.abs(c.change_24h) > 5).length, [allCrypto]);
+  const stableAvgChange = useMemo(() => cryptoStable.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoStable.length || 1), [cryptoStable]);
+  const altAvgChange = useMemo(() => cryptoAlt.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoAlt.length || 1), [cryptoAlt]);
+
+  // Country Risk Analysis
+  const { topCountry } = useMemo(() => {
+    const freq: Record<string, number> = {};
+    sanctions.forEach(s => {
+      if (s.country_code) {
+        freq[s.country_code] = (freq[s.country_code] || 0) + 1;
+      }
+    });
+
+    // Filtering logic: 
+    // 1. Must appear more than once (> 1)
+    // 2. If multiple countries appear more than twice (> 2), show the max.
+    const entries = Object.entries(freq);
+    const over2 = entries.filter(([_, count]) => count > 2);
+    const over1 = entries.filter(([_, count]) => count > 1);
+    
+    let selectedEntry: [string, number] | null = null;
+    
+    if (over2.length > 2) {
+      selectedEntry = over2.sort((a, b) => b[1] - a[1])[0];
+    } else if (over1.length > 0) {
+      selectedEntry = over1.sort((a, b) => b[1] - a[1])[0];
+    }
+
+    return { 
+      topCountry: selectedEntry ? { code: selectedEntry[0], count: selectedEntry[1] } : null 
+    };
+  }, [sanctions]);
 
   return (
     <div className="max-w-[1800px] mx-auto space-y-8 animate-in fade-in zoom-in duration-500">
@@ -196,9 +238,25 @@ export const Dashboard: React.FC = () => {
                       <div className="text-2xl font-bold text-white">{isLoading ? "-" : sanctions.length}</div>
                       <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Verified Additions</div>
                    </div>
-                   <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                      <div className="text-2xl font-bold text-slate-400">0</div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Entity Deletions</div>
+                   <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5 relative overflow-hidden group">
+                      {topCountry && (
+                        <div className="absolute inset-0 bg-emerald-500/5 transition-colors group-hover:bg-emerald-500/10"></div>
+                      )}
+                      <div className="text-2xl font-bold text-slate-200 relative z-10 flex items-center justify-center gap-2">
+                        {topCountry ? (
+                          <div className="flex items-center gap-2">
+                            <img 
+                              src={`https://flagcdn.com/w40/${topCountry.code.toLowerCase()}.png`} 
+                              alt={topCountry.code} 
+                              className="w-6 h-auto rounded border border-white/20 shadow-sm"
+                            />
+                            <span className="text-sm font-black">{topCountry.code}</span>
+                          </div>
+                        ) : '0'}
+                      </div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-1 relative z-10">
+                        {topCountry ? `Concentrated Hub` : 'Entity Deletions'}
+                      </div>
                    </div>
                 </div>
              </div>
@@ -257,11 +315,21 @@ export const Dashboard: React.FC = () => {
           <div className="space-y-6">
             <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-3xl rounded-l-md p-6 h-[624px] flex flex-col relative overflow-hidden">
                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-lg text-emerald-100 flex items-center gap-2">
-                    <ShieldAlert size={20} className="text-emerald-500" />
-                    Latest Sanction Entities
-                  </h3>
-                  <span className="bg-emerald-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{sanctions.length}</span>
+                  <div className="flex flex-col">
+                    <h3 className="font-bold text-lg text-emerald-100 flex items-center gap-2">
+                      <ShieldAlert size={20} className="text-emerald-500" />
+                      Latest Sanction Entities
+                    </h3>
+                    {topCountry && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <MapPin size={10} className="text-emerald-400" />
+                        <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400/80">
+                          Intensity Hub: {topCountry.code} ({topCountry.count} Occurrences)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="bg-emerald-500 text-white px-2 py-1 rounded-lg text-xs font-bold shrink-0">{sanctions.length}</span>
                </div>
                
                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
@@ -278,7 +346,11 @@ export const Dashboard: React.FC = () => {
                     </div>
                   ) : (
                     sanctions.map((item, i) => (
-                      <EntityRow key={i} item={item} type="add" />
+                      <EntityRow 
+                        key={i} 
+                        item={item} 
+                        type="add" 
+                      />
                     ))
                   )}
                </div>
