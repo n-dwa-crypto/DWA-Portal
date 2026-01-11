@@ -13,7 +13,8 @@ import {
   Globe, 
   Loader2, 
   MapPin,
-  AlertTriangle
+  AlertTriangle,
+  Zap
 } from 'lucide-react';
 
 // --- UNIVERSAL COUNTRY LOOKUP ---
@@ -165,6 +166,12 @@ export const Dashboard: React.FC = () => {
   const stableAvgChange = useMemo(() => cryptoStable.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoStable.length || 1), [cryptoStable]);
   const altAvgChange = useMemo(() => cryptoAlt.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoAlt.length || 1), [cryptoAlt]);
 
+  // Identify Most Volatile Asset
+  const mostVolatileAsset = useMemo(() => {
+    if (allCrypto.length === 0) return null;
+    return [...allCrypto].sort((a, b) => Math.abs(b.change_24h) - Math.abs(a.change_24h))[0];
+  }, [allCrypto]);
+
   // Country Risk Analysis
   const { topCountry } = useMemo(() => {
     const freq: Record<string, number> = {};
@@ -263,7 +270,6 @@ export const Dashboard: React.FC = () => {
                         <div className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-6">Territory Risk Hotspot</div>
                         
                         <div className="relative mb-8 flex items-center justify-center">
-                           {/* Glow effect centered behind flag */}
                            <div className="absolute w-40 h-40 bg-rose-500/20 blur-[60px] rounded-full"></div>
                            <img 
                               src={`https://flagcdn.com/w160/${topCountry.code.toLowerCase()}.png`} 
@@ -297,13 +303,15 @@ export const Dashboard: React.FC = () => {
              </div>
           </div>
 
-          {/* Market momentum Card */}
+          {/* Market momentum Card - REDESIGNED MOMENTUM HEATMAP */}
           <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.15)] group">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
-             <div className="relative z-10 p-10 h-full flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
+             
+             <div className="relative z-10 p-10 h-full flex flex-col lg:flex-row gap-10">
+                {/* Left: Global Momentum Stats */}
+                <div className="lg:w-1/2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-8">
                        <div className="p-3 rounded-2xl bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/30 shadow-lg">
                           <Activity size={24} />
                        </div>
@@ -312,28 +320,81 @@ export const Dashboard: React.FC = () => {
                           <span className="text-[10px] font-black text-cyan-400/80 uppercase tracking-widest mt-1">Asset Volatility Scan</span>
                        </div>
                     </div>
-                    <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-black rounded-full uppercase tracking-widest">Active</span>
+                    
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 tracking-tighter mb-2">
+                        {isLoading ? "..." : highVolatilityCount}
+                      </div>
+                    </div>
+                    <p className="text-cyan-300/60 font-bold uppercase text-[10px] tracking-[0.2em]">High Impact Volatility Targets Detected</p>
                   </div>
-                  
-                  <div className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 tracking-tighter mb-2">
-                    {isLoading ? "..." : highVolatilityCount}
+
+                  <div className="grid grid-cols-2 gap-4 mt-10">
+                    <div className={`bg-white/5 rounded-2xl p-4 text-center border border-white/5`}>
+                        <div className={`text-2xl font-black ${stableAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isLoading ? "-" : `${stableAvgChange.toFixed(1)}%`}
+                        </div>
+                        <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Stability Index</div>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
+                        <div className={`text-2xl font-black ${altAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isLoading ? "-" : `${altAvgChange.toFixed(1)}%`}
+                        </div>
+                        <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Alt Asset Avg</div>
+                    </div>
                   </div>
-                  <p className="text-cyan-300/60 font-bold uppercase text-[10px] tracking-[0.2em]">High Impact Volatility Targets Detected</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-10">
-                   <div className={`bg-white/5 rounded-2xl p-4 text-center border border-white/5`}>
-                      <div className={`text-2xl font-black ${stableAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isLoading ? "-" : `${stableAvgChange.toFixed(1)}%`}
+                {/* Right: Asset Volatility Spotlight */}
+                <div className="lg:w-1/2 flex-1 relative flex items-center justify-center">
+                  <div className="w-full h-full min-h-[300px] rounded-[32px] bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 p-8 flex flex-col justify-center items-center text-center overflow-hidden">
+                    <div className="absolute top-6 right-6 animate-pulse">
+                      <Zap size={24} className="text-cyan-400" />
+                    </div>
+                    
+                    {mostVolatileAsset ? (
+                      <div className="animate-in fade-in zoom-in-95 duration-700 w-full flex flex-col items-center">
+                        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em] mb-6">Momentum Spotlight</div>
+                        
+                        <div className="relative mb-8 flex items-center justify-center">
+                           <div className={`absolute w-40 h-40 blur-[60px] rounded-full ${mostVolatileAsset.change_24h >= 0 ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`}></div>
+                           <div className={`
+                              w-32 h-32 relative z-10 rounded-full flex items-center justify-center text-5xl font-black shadow-2xl border-4 border-white/10 ring-8 
+                              ${mostVolatileAsset.change_24h >= 0 ? 'bg-emerald-500/20 text-emerald-400 ring-emerald-500/10' : 'bg-rose-500/20 text-rose-400 ring-rose-500/10'}
+                              transition-transform duration-500 hover:scale-110
+                           `}>
+                              {mostVolatileAsset.symbol}
+                           </div>
+                        </div>
+
+                        <h3 className="text-3xl font-black text-white tracking-tight mb-2 uppercase">{mostVolatileAsset.name}</h3>
+                        <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-8 ${
+                          mostVolatileAsset.change_24h >= 0 ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-rose-500/20 border-rose-500/30'
+                        }`}>
+                           <span className={`text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                             mostVolatileAsset.change_24h >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                           }`}>
+                             {mostVolatileAsset.change_24h >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                             {Math.abs(mostVolatileAsset.change_24h).toFixed(2)}% Daily Velocity
+                           </span>
+                        </div>
+
+                        <div className="bg-black/60 backdrop-blur-md rounded-2xl p-5 border border-white/5 w-full shadow-2xl">
+                           <div className="flex items-center justify-center gap-2 text-cyan-200">
+                             <Activity size={14} className="shrink-0" />
+                             <p className="text-[11px] font-black uppercase tracking-tight">
+                                CRITICAL: High Volatility Node
+                             </p>
+                           </div>
+                           <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mt-2">
+                              LIQUIDITY REVIEW RECOMMENDED
+                           </p>
+                        </div>
                       </div>
-                      <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Stability Index</div>
-                   </div>
-                   <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                      <div className={`text-2xl font-black ${altAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isLoading ? "-" : `${altAvgChange.toFixed(1)}%`}
-                      </div>
-                      <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Alt Asset Avg</div>
-                   </div>
+                    ) : (
+                      <div className="text-slate-500 font-black uppercase text-xs">Scanning markets...</div>
+                    )}
+                  </div>
                 </div>
              </div>
           </div>
