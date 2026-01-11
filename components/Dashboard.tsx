@@ -213,7 +213,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Sanctions Card - REDESIGNED HEATMAP */}
+          {/* Sanctions Card - HEATMAP */}
           <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-purple-500/20 to-rose-500/20 border border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.2)] group">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
              
@@ -236,7 +236,7 @@ export const Dashboard: React.FC = () => {
                         {isLoading ? "..." : sanctions.length}
                       </div>
                     </div>
-                    <p className="text-purple-300/60 font-bold uppercase text-[10px] tracking-[0.2em]">System-wide entity updates verified</p>
+                    <p className="text-purple-300/60 font-bold uppercase text-[10px] tracking-[0.2em]">Total entity updates verified across network</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mt-10">
@@ -251,50 +251,53 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Right: High Impact Risk Heatmap */}
-                <div className="lg:w-1/2 flex-1 relative">
-                  <div className="h-full rounded-[32px] bg-gradient-to-br from-rose-500/10 to-transparent border border-rose-500/20 p-6 flex flex-col justify-center items-center text-center overflow-hidden group/heatmap">
-                    <div className="absolute top-4 right-4 animate-pulse">
+                {/* Right: High Impact Risk Heatmap - CENTERED FLAG */}
+                <div className="lg:w-1/2 flex-1 relative flex items-center justify-center">
+                  <div className="w-full h-full min-h-[300px] rounded-[32px] bg-gradient-to-br from-rose-500/10 to-transparent border border-rose-500/20 p-8 flex flex-col justify-center items-center text-center overflow-hidden">
+                    <div className="absolute top-6 right-6 animate-pulse">
                       <AlertTriangle size={24} className="text-rose-500" />
                     </div>
                     
                     {topCountry ? (
-                      <div className="animate-in fade-in zoom-in-95 duration-700">
-                        <div className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-4">Territory Risk Hotspot</div>
+                      <div className="animate-in fade-in zoom-in-95 duration-700 w-full flex flex-col items-center">
+                        <div className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-6">Territory Risk Hotspot</div>
                         
-                        <div className="relative mb-6">
-                           {/* Glow effect */}
-                           <div className="absolute inset-0 bg-rose-500/20 blur-2xl rounded-full scale-150"></div>
+                        <div className="relative mb-8 flex items-center justify-center">
+                           {/* Glow effect centered behind flag */}
+                           <div className="absolute w-40 h-40 bg-rose-500/20 blur-[60px] rounded-full"></div>
                            <img 
                               src={`https://flagcdn.com/w160/${topCountry.code.toLowerCase()}.png`} 
                               alt={topCountry.code} 
-                              className="w-24 h-auto relative z-10 rounded-xl shadow-2xl border-4 border-white/10 ring-8 ring-rose-500/10"
+                              className="w-32 h-auto relative z-10 rounded-2xl shadow-2xl border-4 border-white/10 ring-8 ring-rose-500/10 transition-transform duration-500 hover:scale-105"
                             />
                         </div>
 
-                        <h3 className="text-3xl font-black text-white tracking-tight mb-1">{getCountryName(topCountry.code)}</h3>
-                        <div className="inline-flex items-center gap-2 bg-rose-500/20 px-3 py-1 rounded-full border border-rose-500/30 mb-6">
-                           <span className="text-rose-300 text-[10px] font-black uppercase">{topCountry.count} Targeted Actions</span>
+                        <h3 className="text-3xl font-black text-white tracking-tight mb-2 uppercase">{getCountryName(topCountry.code)}</h3>
+                        <div className="inline-flex items-center gap-2 bg-rose-500/20 px-4 py-1.5 rounded-full border border-rose-500/30 mb-8">
+                           <span className="text-rose-300 text-[11px] font-black uppercase tracking-wider">{topCountry.count} Targeted Actions Detected</span>
                         </div>
 
-                        <div className="bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-rose-500/10 w-full">
-                           <p className="text-[11px] font-bold text-rose-200/90 flex items-center justify-center gap-1.5 leading-tight">
-                              CRITICAL: INVESTMENT REVIEW REQUIRED
-                           </p>
-                           <p className="text-[9px] text-rose-400/60 font-black uppercase tracking-widest mt-2">
-                              High Exposure Zone Detected
+                        <div className="bg-black/60 backdrop-blur-md rounded-2xl p-5 border border-rose-500/20 w-full shadow-2xl">
+                           <div className="flex items-center justify-center gap-2 text-rose-200">
+                             <ShieldAlert size={14} className="shrink-0" />
+                             <p className="text-[11px] font-black uppercase tracking-tight">
+                                CRITICAL: High Exposure Zone
+                             </p>
+                           </div>
+                           <p className="text-[9px] text-rose-400/60 font-black uppercase tracking-[0.2em] mt-2">
+                              INVESTMENT REVIEW REQUIRED
                            </p>
                         </div>
                       </div>
                     ) : (
-                      <div className="text-slate-500 font-black uppercase text-xs">No Concentrated Risks</div>
+                      <div className="text-slate-500 font-black uppercase text-xs">Analysis in progress...</div>
                     )}
                   </div>
                 </div>
              </div>
           </div>
 
-          {/* Crypto Card */}
+          {/* Market momentum Card */}
           <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.15)] group">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
              <div className="relative z-10 p-10 h-full flex flex-col justify-between">
