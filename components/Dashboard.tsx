@@ -15,6 +15,18 @@ import {
   MapPin
 } from 'lucide-react';
 
+// --- UNIVERSAL COUNTRY LOOKUP ---
+const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+
+const getCountryName = (code: string) => {
+  if (!code) return '';
+  try {
+    return regionNames.of(code) || code;
+  } catch (e) {
+    return code;
+  }
+};
+
 // --- TIER 3 MOCK DATA (High-level insights) ---
 const tier3Data = {
   "correlations": [
@@ -161,15 +173,14 @@ export const Dashboard: React.FC = () => {
       }
     });
 
-    // Filtering logic: 
-    // 1. Must appear more than once (> 1)
-    // 2. If multiple countries appear more than twice (> 2), show the max.
     const entries = Object.entries(freq);
     const over2 = entries.filter(([_, count]) => count > 2);
     const over1 = entries.filter(([_, count]) => count > 1);
     
     let selectedEntry: [string, number] | null = null;
     
+    // Logic: If there are more than 2 countries with more than 2 occurrences, show max.
+    // Otherwise show max of those with more than 1.
     if (over2.length > 2) {
       selectedEntry = over2.sort((a, b) => b[1] - a[1])[0];
     } else if (over1.length > 0) {
@@ -230,7 +241,19 @@ export const Dashboard: React.FC = () => {
                   <div className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-200 tracking-tighter mb-2">
                     {isLoading ? "..." : sanctions.length}
                   </div>
-                  <p className="text-purple-300/80 font-medium">Total detected operational changes</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-purple-300/80 font-medium">Total operational changes detected in</p>
+                    {topCountry && (
+                        <div className="flex items-center gap-2 px-2 py-0.5 rounded-lg bg-white/10 border border-white/10 shadow-sm animate-in fade-in slide-in-from-left-2 duration-500">
+                          <img 
+                            src={`https://flagcdn.com/w20/${topCountry.code.toLowerCase()}.png`} 
+                            alt={topCountry.code} 
+                            className="w-4 h-auto rounded-sm"
+                          />
+                          <span className="text-[10px] font-bold text-white uppercase tracking-wider">{getCountryName(topCountry.code)}</span>
+                        </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/10">
@@ -238,25 +261,9 @@ export const Dashboard: React.FC = () => {
                       <div className="text-2xl font-bold text-white">{isLoading ? "-" : sanctions.length}</div>
                       <div className="text-xs text-slate-400 uppercase tracking-wider mt-1">Verified Additions</div>
                    </div>
-                   <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5 relative overflow-hidden group">
-                      {topCountry && (
-                        <div className="absolute inset-0 bg-emerald-500/5 transition-colors group-hover:bg-emerald-500/10"></div>
-                      )}
-                      <div className="text-2xl font-bold text-slate-200 relative z-10 flex items-center justify-center gap-2">
-                        {topCountry ? (
-                          <div className="flex items-center gap-2">
-                            <img 
-                              src={`https://flagcdn.com/w40/${topCountry.code.toLowerCase()}.png`} 
-                              alt={topCountry.code} 
-                              className="w-6 h-auto rounded border border-white/20 shadow-sm"
-                            />
-                            <span className="text-sm font-black">{topCountry.code}</span>
-                          </div>
-                        ) : '0'}
-                      </div>
-                      <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-1 relative z-10">
-                        {topCountry ? `Concentrated Hub` : 'Entity Deletions'}
-                      </div>
+                   <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
+                      <div className="text-2xl font-bold text-slate-500">0</div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Entity Deletions</div>
                    </div>
                 </div>
              </div>
@@ -324,7 +331,7 @@ export const Dashboard: React.FC = () => {
                       <div className="flex items-center gap-1.5 mt-1">
                         <MapPin size={10} className="text-emerald-400" />
                         <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400/80">
-                          Intensity Hub: {topCountry.code} ({topCountry.count} Occurrences)
+                          Risk Focus: {getCountryName(topCountry.code)} ({topCountry.count} Occurrences)
                         </span>
                       </div>
                     )}
