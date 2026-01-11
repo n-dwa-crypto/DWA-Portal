@@ -3,60 +3,70 @@
     "id": 54604,
     "name": "STORELAB, S.A. DE C.V.",
     "publication_id": 754,
-    "publication_date": "2025-10-06"
+    "publication_date": "2025-10-06",
+    "country_code": "MX"
   },
   {
     "id": 54662,
     "name": "CONDE URAGA, Martha Emilia",
     "publication_id": 754,
-    "publication_date": "2025-10-06"
+    "publication_date": "2025-10-06",
+    "country_code": "MX"
   },
   {
     "id": 54663,
     "name": "COMERCIAL VIOSMA DEL NOROESTE, S.A. DE C.V.",
     "publication_id": 754,
-    "publication_date": "2025-10-06"
+    "publication_date": "2025-10-06",
+    "country_code": "MX"
   },
   {
     "id": 54667,
     "name": "FAVELA LOPEZ, Francisco",
     "publication_id": 754,
-    "publication_date": "2025-10-06"
+    "publication_date": "2025-10-06",
+    "country_code": "MX"
   },
   {
     "id": 54671,
     "name": "VERDUGO ARAUJO, Jairo",
     "publication_id": 754,
-    "publication_date": "2025-10-06"
+    "publication_date": "2025-10-06",
+    "country_code": "MX"
   },
   {
     "id": 55202,
     "name": "HOSEINI MUNES, Sayyed Ahmad",
     "publication_id": 753,
-    "publication_date": "2025-10-01"
+    "publication_date": "2025-10-01",
+    "country_code": "IR"
   },
   {
     "id": 55402,
     "name": "SUN, Zhaolan",
     "publication_id": 753,
-    "publication_date": "2025-10-01"
+    "publication_date": "2025-10-01",
+    "country_code": "CN"
   },
   {
     "id": 55403,
     "name": "WESTCOM TECHNOLOGY CO LIMITED",
     "publication_id": 753,
-    "publication_date": "2025-10-01"
+    "publication_date": "2025-10-01",
+    "country_code": "HK"
   },
   {
     "id": 55444,
     "name": "ROCKET PCB SOLUTION LTD",
     "publication_id": 753,
-    "publication_date": "2025-10-01"
+    "publication_date": "2025-10-01",
+    "country_code": "HK"
   },
   {
     "id": 55550,
     "name": "PERFECT DAY CO SA",
     "publication_id": 753,
-    "publication_date": "2025-10-01"
+    "publication_date": "2025-10-01",
+    "country_code": "PA"
   }
 ]
