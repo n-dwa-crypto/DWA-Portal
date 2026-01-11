@@ -31,12 +31,23 @@ export const ActionWidget: React.FC<ActionWidgetProps> = ({ type, onSubmit, titl
   };
 
   const isNews = type === RecordType.NEWS;
-  const gradientClass = isNews 
-    ? 'from-blue-500 to-indigo-600 shadow-blue-500/20' 
-    : 'from-rose-500 to-orange-600 shadow-rose-500/20';
+  const isSanction = type === RecordType.SANCTION;
   
-  const Icon = isNews ? FileText : ShieldAlert;
-  const accentColor = isNews ? 'bg-blue-500' : 'bg-rose-500';
+  let gradientClass = 'from-rose-500 to-orange-600 shadow-rose-500/20';
+  let accentColor = 'bg-rose-500';
+  let Icon = ShieldAlert;
+
+  if (isNews) {
+    gradientClass = 'from-blue-500 to-indigo-600 shadow-blue-500/20';
+    accentColor = 'bg-blue-500';
+    Icon = FileText;
+  }
+
+  const getPlaceholder = () => {
+    if (isNews) return "Type the latest crypto news here...";
+    if (isSanction) return "Enter details for new sanction entry (Name, ID, Reason)...";
+    return "Enter details...";
+  };
 
   return (
     <div className="relative group overflow-hidden bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 p-8 shadow-2xl transition-all duration-500 hover:border-white/20 hover:bg-white/10 flex flex-col h-full">
@@ -46,7 +57,7 @@ export const ActionWidget: React.FC<ActionWidgetProps> = ({ type, onSubmit, titl
 
       <div className="flex items-center justify-between mb-8 relative z-10">
         <div className="flex items-center gap-5">
-            <div className={`p-4 rounded-2xl ${isNews ? 'bg-blue-500/10 text-blue-400' : 'bg-rose-500/10 text-rose-400'} ring-1 ring-white/10 shadow-inner`}>
+            <div className={`p-4 rounded-2xl ${accentColor}/10 text-${accentColor.replace('bg-', '')}-400 ring-1 ring-white/10 shadow-inner`}>
             <Icon size={32} />
             </div>
             <div>
@@ -62,7 +73,7 @@ export const ActionWidget: React.FC<ActionWidgetProps> = ({ type, onSubmit, titl
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className="w-full h-full min-h-[220px] bg-black/40 border border-white/5 rounded-[30px] p-7 text-white focus:outline-none focus:ring-2 focus:ring-white/10 focus:bg-black/60 resize-none transition-all placeholder:text-slate-600 text-lg leading-relaxed shadow-2xl"
-            placeholder={isNews ? "Type the latest crypto news here..." : "Enter sanction entity details..."}
+            placeholder={getPlaceholder()}
           />
         </div>
 

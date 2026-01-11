@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
   TrendingUp, 
@@ -214,12 +215,18 @@ export const Dashboard: React.FC = () => {
         }
       });
 
+      // Fix for TS2345: Handle string | undefined
+      const responseText = response.text;
+      if (!responseText) {
+        throw new Error("AI returned empty content");
+      }
+
       // Handle JSON parsing and Grounding sources
       let result: IntelligenceData;
       try {
-        result = JSON.parse(response.text);
+        result = JSON.parse(responseText);
       } catch (e) {
-        console.error("Failed to parse AI response as JSON", response.text);
+        console.error("Failed to parse AI response as JSON", responseText);
         throw new Error("Intelligence parsing failed.");
       }
 
@@ -286,8 +293,6 @@ export const Dashboard: React.FC = () => {
 
   const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
   const highVolatilityCount = useMemo(() => allCrypto.filter(c => Math.abs(c.change_24h) > 5).length, [allCrypto]);
-  const stableAvgChange = useMemo(() => cryptoStable.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoStable.length || 1), [cryptoStable]);
-  const altAvgChange = useMemo(() => cryptoAlt.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoAlt.length || 1), [cryptoAlt]);
 
   const mostVolatileAsset = useMemo(() => {
     if (allCrypto.length === 0) return null;

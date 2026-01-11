@@ -1,3 +1,4 @@
+
 export enum RecordType {
   NEWS = 'NEWS',
   SANCTION = 'SANCTION'

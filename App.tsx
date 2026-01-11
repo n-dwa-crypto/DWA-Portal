@@ -176,7 +176,7 @@ const App: React.FC = () => {
                     <p className="text-4xl font-bold text-white tracking-tighter">{stats.totalNews}</p>
                  </div>
                  <div className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-xl hover:bg-white/10 transition-colors duration-300">
-                    <p className="text-slate-400 text-sm font-medium mb-2 uppercase tracking-wide">Active Sanctions</p>
+                    <p className="text-slate-400 text-sm font-medium mb-2 uppercase tracking-wide">Sanctions</p>
                     <p className="text-4xl font-bold text-white tracking-tighter">{stats.totalSanctions}</p>
                  </div>
                  <div className="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 backdrop-blur-xl p-6 rounded-3xl border border-emerald-500/20 shadow-xl col-span-2 lg:col-span-2 flex items-center justify-between relative overflow-hidden group">
@@ -206,7 +206,7 @@ const App: React.FC = () => {
                 <ActionWidget 
                   type={RecordType.SANCTION}
                   title="Sanction Entry"
-                  description="Log blacklist entities."
+                  description="Log new international restrictions."
                   onSubmit={(content) => handleAddRecord(RecordType.SANCTION, content)}
                 />
               </div>
