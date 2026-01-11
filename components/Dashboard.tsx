@@ -15,7 +15,8 @@ import {
   MapPin,
   AlertTriangle,
   Zap,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -32,6 +33,11 @@ const getCountryName = (code: string) => {
 };
 
 // --- TYPES FOR INTELLIGENCE ---
+interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
 interface IntelligenceData {
   correlations: Array<{
     entity_name: string;
@@ -51,6 +57,7 @@ interface IntelligenceData {
       assigned_to: string;
     }>;
   };
+  sources?: GroundingSource[];
 }
 
 // --- HELPER COMPONENTS ---
@@ -133,14 +140,19 @@ export const Dashboard: React.FC = () => {
     setIsAnalyzing(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-      const prompt = `Perform a high-level strategic intelligence analysis.
-      Context: 
-      - Sanctions List: ${JSON.stringify(sanctionsData)}
-      - Crypto Market: ${JSON.stringify(cryptoData)}
-      - Task: Generate smart strategic insights. Identify correlations between sanctioned entities/countries and specific crypto assets. 
-      - Tone: Diplomatic, professional, institutional.
-      - External Context: Consider current global affairs, geopolitical tensions, and recent financial news.
-      - Goal: Provide 2 key correlations and 2-3 strategic recommendations for an investment risk profile.`;
+      const prompt = `Act as a senior geopolitical risk analyst. Conduct a professional, diplomatic, and institutional analysis.
+      
+      DATASETS:
+      - Latest Sanctions: ${JSON.stringify(sanctionsData.slice(0, 5))} (Sample size: 5)
+      - Asset Momentum: ${JSON.stringify(cryptoData)}
+      
+      OBJECTIVES:
+      1. Synthesize current global affairs and macroeconomic trends with this specific data.
+      2. Identify high-level correlations between the provided sanctioned entities/regions and market behavior of specific crypto assets.
+      3. Propose strategic recommendations for fund management and risk mitigation.
+      
+      TONE: Diplomatic, expert-level, objective. Avoid alarmist language.
+      PRIORITY: Use Google Search to cross-reference recent news about these regions and assets.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -170,7 +182,7 @@ export const Dashboard: React.FC = () => {
                         }
                       }
                     },
-                    risk_level: { type: Type.STRING, description: 'Must be LOW, MEDIUM, or HIGH' }
+                    risk_level: { type: Type.STRING }
                   },
                   required: ["entity_name", "correlation_type", "confidence", "related_cryptos", "risk_level"]
                 }
@@ -202,10 +214,34 @@ export const Dashboard: React.FC = () => {
         }
       });
 
-      const result = JSON.parse(response.text);
+      // Handle JSON parsing and Grounding sources
+      let result: IntelligenceData;
+      try {
+        result = JSON.parse(response.text);
+      } catch (e) {
+        console.error("Failed to parse AI response as JSON", response.text);
+        throw new Error("Intelligence parsing failed.");
+      }
+
+      // Extract sources from grounding metadata if available
+      const sources: GroundingSource[] = [];
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      if (chunks) {
+        chunks.forEach((chunk: any) => {
+          if (chunk.web) {
+            sources.push({
+              title: chunk.web.title || 'Source',
+              uri: chunk.web.uri
+            });
+          }
+        });
+      }
+      
+      result.sources = sources;
       setIntelligence(result);
     } catch (err) {
       console.error("AI Analysis Error:", err);
+      setError("AI Node analysis failed. Retry initiated...");
     } finally {
       setIsAnalyzing(false);
     }
@@ -235,7 +271,6 @@ export const Dashboard: React.FC = () => {
         setCryptoStable(stableData);
         setCryptoAlt(altData);
 
-        // Run intelligence analysis once data is loaded
         const combinedCrypto = [...stableData, ...altData];
         runIntelligenceAnalysis(sanctionsData, combinedCrypto);
       } catch (err: any) {
@@ -249,19 +284,16 @@ export const Dashboard: React.FC = () => {
     fetchData();
   }, [runIntelligenceAnalysis]);
 
-  // Calculate dynamic stats from the data
   const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
   const highVolatilityCount = useMemo(() => allCrypto.filter(c => Math.abs(c.change_24h) > 5).length, [allCrypto]);
   const stableAvgChange = useMemo(() => cryptoStable.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoStable.length || 1), [cryptoStable]);
   const altAvgChange = useMemo(() => cryptoAlt.reduce((acc, c) => acc + c.change_24h, 0) / (cryptoAlt.length || 1), [cryptoAlt]);
 
-  // Identify Most Volatile Asset
   const mostVolatileAsset = useMemo(() => {
     if (allCrypto.length === 0) return null;
     return [...allCrypto].sort((a, b) => Math.abs(b.change_24h) - Math.abs(a.change_24h))[0];
   }, [allCrypto]);
 
-  // Country Risk Analysis
   const { topCountry } = useMemo(() => {
     const freq: Record<string, number> = {};
     sanctions.forEach(s => {
@@ -269,13 +301,9 @@ export const Dashboard: React.FC = () => {
         freq[s.country_code] = (freq[s.country_code] || 0) + 1;
       }
     });
-
     const entries = Object.entries(freq);
     const sorted = entries.sort((a, b) => b[1] - a[1]);
-    
-    return { 
-      topCountry: sorted.length > 0 ? { code: sorted[0][0], count: sorted[0][1] } : null 
-    };
+    return { topCountry: sorted.length > 0 ? { code: sorted[0][0], count: sorted[0][1] } : null };
   }, [sanctions]);
 
   return (
@@ -309,12 +337,10 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Sanctions Card - HEATMAP */}
+          {/* Sanctions Card */}
           <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-purple-500/20 to-rose-500/20 border border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.2)] group">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
-             
              <div className="relative z-10 p-10 h-full flex flex-col lg:flex-row gap-10">
-                {/* Left: Global Stats */}
                 <div className="lg:w-1/2 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-3 mb-8">
@@ -326,7 +352,6 @@ export const Dashboard: React.FC = () => {
                           <span className="text-[10px] font-black text-purple-400/80 uppercase tracking-widest mt-1">Real-time sync</span>
                        </div>
                     </div>
-                    
                     <div className="flex items-baseline gap-2">
                       <div className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-200 tracking-tighter mb-2">
                         {isLoading ? "..." : sanctions.length}
@@ -334,30 +359,16 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <p className="text-purple-300/60 font-bold uppercase text-[10px] tracking-[0.2em]">Total entity updates verified across network</p>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-10">
-                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                        <div className="text-2xl font-black text-white">{isLoading ? "-" : sanctions.length}</div>
-                        <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Verified Adds</div>
-                    </div>
-                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                        <div className="text-2xl font-black text-slate-500">0</div>
-                        <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Deletions</div>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Right: High Impact Risk Heatmap - CENTERED FLAG */}
                 <div className="lg:w-1/2 flex-1 relative flex items-center justify-center">
                   <div className="w-full h-full min-h-[300px] rounded-[32px] bg-gradient-to-br from-rose-500/10 to-transparent border border-rose-500/20 p-8 flex flex-col justify-center items-center text-center overflow-hidden">
                     <div className="absolute top-6 right-6 animate-pulse">
                       <AlertTriangle size={24} className="text-rose-500" />
                     </div>
-                    
                     {topCountry ? (
                       <div className="animate-in fade-in zoom-in-95 duration-700 w-full flex flex-col items-center">
                         <div className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-6">Territory Risk Hotspot</div>
-                        
                         <div className="relative mb-8 flex items-center justify-center">
                            <div className="absolute w-40 h-40 bg-rose-500/20 blur-[60px] rounded-full"></div>
                            <img 
@@ -366,22 +377,12 @@ export const Dashboard: React.FC = () => {
                               className="w-32 h-auto relative z-10 rounded-2xl shadow-2xl border-4 border-white/10 ring-8 ring-rose-500/10 transition-transform duration-500 hover:scale-105"
                             />
                         </div>
-
                         <h3 className="text-3xl font-black text-white tracking-tight mb-2 uppercase">{getCountryName(topCountry.code)}</h3>
-                        <div className="inline-flex items-center gap-2 bg-rose-500/20 px-4 py-1.5 rounded-full border border-rose-500/30 mb-8">
-                           <span className="text-rose-300 text-[11px] font-black uppercase tracking-wider">{topCountry.count} Targeted Actions Detected</span>
-                        </div>
-
                         <div className="bg-black/60 backdrop-blur-md rounded-2xl p-5 border border-rose-500/20 w-full shadow-2xl">
                            <div className="flex items-center justify-center gap-2 text-rose-200">
                              <ShieldAlert size={14} className="shrink-0" />
-                             <p className="text-[11px] font-black uppercase tracking-tight">
-                                CRITICAL: High Exposure Zone
-                             </p>
+                             <p className="text-[11px] font-black uppercase tracking-tight">CRITICAL: High Exposure Zone</p>
                            </div>
-                           <p className="text-[9px] text-rose-400/60 font-black uppercase tracking-[0.2em] mt-2">
-                              INVESTMENT REVIEW REQUIRED
-                           </p>
                         </div>
                       </div>
                     ) : (
@@ -392,12 +393,10 @@ export const Dashboard: React.FC = () => {
              </div>
           </div>
 
-          {/* Market momentum Card - MOMENTUM HEATMAP */}
+          {/* Market momentum Card */}
           <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.15)] group">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
-             
              <div className="relative z-10 p-10 h-full flex flex-col lg:flex-row gap-10">
-                {/* Left: Global Momentum Stats */}
                 <div className="lg:w-1/2 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-3 mb-8">
@@ -409,75 +408,29 @@ export const Dashboard: React.FC = () => {
                           <span className="text-[10px] font-black text-cyan-400/80 uppercase tracking-widest mt-1">Asset Volatility Scan</span>
                        </div>
                     </div>
-                    
                     <div className="flex items-baseline gap-2">
                       <div className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 tracking-tighter mb-2">
                         {isLoading ? "..." : highVolatilityCount}
                       </div>
                     </div>
-                    <p className="text-cyan-300/60 font-bold uppercase text-[10px] tracking-[0.2em]">High Impact Volatility Targets Detected</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-10">
-                    <div className={`bg-white/5 rounded-2xl p-4 text-center border border-white/5`}>
-                        <div className={`text-2xl font-black ${stableAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isLoading ? "-" : `${stableAvgChange.toFixed(1)}%`}
-                        </div>
-                        <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Stability Index</div>
-                    </div>
-                    <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/5">
-                        <div className={`text-2xl font-black ${altAvgChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isLoading ? "-" : `${altAvgChange.toFixed(1)}%`}
-                        </div>
-                        <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Alt Asset Avg</div>
-                    </div>
                   </div>
                 </div>
 
-                {/* Right: Asset Volatility Spotlight */}
                 <div className="lg:w-1/2 flex-1 relative flex items-center justify-center">
                   <div className="w-full h-full min-h-[300px] rounded-[32px] bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 p-8 flex flex-col justify-center items-center text-center overflow-hidden">
                     <div className="absolute top-6 right-6 animate-pulse">
                       <Zap size={24} className="text-cyan-400" />
                     </div>
-                    
                     {mostVolatileAsset ? (
                       <div className="animate-in fade-in zoom-in-95 duration-700 w-full flex flex-col items-center">
                         <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em] mb-6">Momentum Spotlight</div>
-                        
-                        <div className="relative mb-8 flex items-center justify-center">
-                           <div className={`absolute w-40 h-40 blur-[60px] rounded-full ${mostVolatileAsset.change_24h >= 0 ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`}></div>
-                           <div className={`
-                              w-32 h-32 relative z-10 rounded-full flex items-center justify-center text-5xl font-black shadow-2xl border-4 border-white/10 ring-8 
-                              ${mostVolatileAsset.change_24h >= 0 ? 'bg-emerald-500/20 text-emerald-400 ring-emerald-500/10' : 'bg-rose-500/20 text-rose-400 ring-rose-500/10'}
-                              transition-transform duration-500 hover:scale-110
-                           `}>
-                              {mostVolatileAsset.symbol}
-                           </div>
+                        <div className="w-32 h-32 relative z-10 rounded-full flex items-center justify-center text-5xl font-black shadow-2xl border-4 border-white/10 bg-cyan-500/10 text-cyan-400 ring-8 ring-cyan-500/10 mb-6 transition-transform hover:scale-110">
+                           {mostVolatileAsset.symbol}
                         </div>
-
                         <h3 className="text-3xl font-black text-white tracking-tight mb-2 uppercase">{mostVolatileAsset.name}</h3>
-                        <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-8 ${
-                          mostVolatileAsset.change_24h >= 0 ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-rose-500/20 border-rose-500/30'
-                        }`}>
-                           <span className={`text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
-                             mostVolatileAsset.change_24h >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                           }`}>
-                             {mostVolatileAsset.change_24h >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                             {Math.abs(mostVolatileAsset.change_24h).toFixed(2)}% Daily Velocity
-                           </span>
-                        </div>
-
-                        <div className="bg-black/60 backdrop-blur-md rounded-2xl p-5 border border-white/5 w-full shadow-2xl">
-                           <div className="flex items-center justify-center gap-2 text-cyan-200">
-                             <Activity size={14} className="shrink-0" />
-                             <p className="text-[11px] font-black uppercase tracking-tight">
-                                CRITICAL: High Volatility Node
-                             </p>
-                           </div>
-                           <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mt-2">
-                              LIQUIDITY REVIEW RECOMMENDED
-                           </p>
+                        <div className={`text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 ${mostVolatileAsset.change_24h >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                           {mostVolatileAsset.change_24h >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                           {Math.abs(mostVolatileAsset.change_24h).toFixed(2)}% Daily Velocity
                         </div>
                       </div>
                     ) : (
@@ -497,98 +450,35 @@ export const Dashboard: React.FC = () => {
             <span className="text-xs font-bold tracking-[0.2em] text-blue-300 uppercase">Tier 2 • Analysis Agent</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          {/* Sanctions Analysis Column */}
-          <div className="space-y-6">
-            <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-[40px] rounded-l-md p-8 h-[624px] flex flex-col relative overflow-hidden shadow-2xl">
-               <div className="flex justify-between items-center mb-6">
-                  <div className="flex flex-col">
-                    <h3 className="font-black text-xl text-emerald-100 flex items-center gap-2 uppercase tracking-tight">
-                      <ShieldAlert size={20} className="text-emerald-500" />
-                      Detailed Sanctions List
-                    </h3>
-                    {topCountry && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <MapPin size={12} className="text-emerald-400" />
-                        <span className="text-[11px] uppercase font-black tracking-widest text-emerald-400/80">
-                           Focus Zone: {getCountryName(topCountry.code)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="bg-emerald-500 text-white px-3 py-1 rounded-xl text-sm font-black shrink-0 shadow-lg">{sanctions.length}</span>
-               </div>
-               
-               <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                  {isLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
-                      <Loader2 className="animate-spin" size={24} />
-                      <span className="text-xs font-black uppercase tracking-widest">Polling secure nodes...</span>
-                    </div>
-                  ) : error ? (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-500 text-center px-4">
-                      <Database size={32} className="mb-2 opacity-20" />
-                      <span className="text-xs font-black uppercase tracking-widest text-rose-400">{error}</span>
-                    </div>
-                  ) : (
-                    sanctions.map((item, i) => (
-                      <EntityRow 
-                        key={i} 
-                        item={item} 
-                        type="add" 
-                      />
-                    ))
-                  )}
-               </div>
-            </div>
+          <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-[40px] rounded-l-md p-8 h-[500px] flex flex-col shadow-2xl">
+             <h3 className="font-black text-xl text-emerald-100 flex items-center gap-2 uppercase tracking-tight mb-6">
+                <ShieldAlert size={20} className="text-emerald-500" />
+                Sanctions Log
+             </h3>
+             <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                {sanctions.map((item, i) => <EntityRow key={i} item={item} type="add" />)}
+             </div>
           </div>
-
-          {/* Crypto Analysis Column */}
           <div className="space-y-6">
-             {/* BTC & Stable */}
-             <div className="bg-black/30 backdrop-blur-xl border-l-4 border-amber-500 rounded-r-[40px] rounded-l-md p-8 h-[300px] flex flex-col shadow-2xl">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-black text-xl text-amber-100 flex items-center gap-2 uppercase tracking-tight">
-                    <Bitcoin size={20} className="text-amber-500" />
-                    Market Caps
-                  </h3>
-                  <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-xl text-sm font-black shadow-lg">{cryptoStable.length}</span>
-               </div>
-               <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                  {isLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
-                      <Loader2 className="animate-spin" size={16} />
-                    </div>
-                  ) : (
-                    cryptoStable.map((item, i) => (
-                      <CryptoRow key={i} item={item} />
-                    ))
-                  )}
-               </div>
-            </div>
-
-            {/* Altcoins */}
-            <div className="bg-black/30 backdrop-blur-xl border-l-4 border-indigo-500 rounded-r-[40px] rounded-l-md p-8 h-[300px] flex flex-col shadow-2xl">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-black text-xl text-indigo-100 flex items-center gap-2 uppercase tracking-tight">
-                    <Globe size={20} className="text-indigo-500" />
-                    Emerging Alts
-                  </h3>
-                  <span className="bg-indigo-500/20 text-indigo-400 px-3 py-1 rounded-xl text-sm font-black shadow-lg">{cryptoAlt.length}</span>
-               </div>
-               <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                  {isLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500">
-                      <Loader2 className="animate-spin" size={16} />
-                    </div>
-                  ) : (
-                    cryptoAlt.map((item, i) => (
-                      <CryptoRow key={i} item={item} />
-                    ))
-                  )}
-               </div>
-            </div>
+             <div className="bg-black/30 backdrop-blur-xl border-l-4 border-amber-500 rounded-r-[40px] rounded-l-md p-8 h-[240px] flex flex-col shadow-2xl">
+                <h3 className="font-black text-xl text-amber-100 flex items-center gap-2 uppercase tracking-tight mb-4">
+                   <Bitcoin size={20} className="text-amber-500" />
+                   Stable Node Status
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                   {cryptoStable.map((item, i) => <CryptoRow key={i} item={item} />)}
+                </div>
+             </div>
+             <div className="bg-black/30 backdrop-blur-xl border-l-4 border-indigo-500 rounded-r-[40px] rounded-l-md p-8 h-[240px] flex flex-col shadow-2xl">
+                <h3 className="font-black text-xl text-indigo-100 flex items-center gap-2 uppercase tracking-tight mb-4">
+                   <Globe size={20} className="text-indigo-500" />
+                   Alt Intelligence
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                   {cryptoAlt.map((item, i) => <CryptoRow key={i} item={item} />)}
+                </div>
+             </div>
           </div>
         </div>
       </section>
@@ -603,93 +493,89 @@ export const Dashboard: React.FC = () => {
 
         <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 backdrop-blur-3xl border border-emerald-500/20 rounded-[40px] p-10 shadow-2xl relative overflow-hidden">
             {isAnalyzing && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-500">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4">
                 <RefreshCw size={48} className="text-emerald-400 animate-spin" />
-                <div className="text-center">
-                  <p className="text-xl font-black text-white uppercase tracking-widest">Generating AI Intelligence</p>
-                  <p className="text-xs text-emerald-300/60 font-black uppercase tracking-[0.3em] mt-2">Consulting Global Knowledge Graph...</p>
-                </div>
+                <p className="text-xl font-black text-white uppercase tracking-widest">Synthesizing Global Insights</p>
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-6 mb-10">
-                <div className="text-center p-6 bg-black/30 rounded-3xl border border-white/5 shadow-inner">
-                   <div className="text-4xl font-black text-emerald-400">{intelligence?.intelligence.total_correlations || 0}</div>
-                   <div className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">Detected Patterns</div>
-                </div>
-                <div className="text-center p-6 bg-black/30 rounded-3xl border border-white/5 shadow-inner">
-                   <div className="text-4xl font-black text-rose-500">{intelligence?.intelligence.high_risk || 0}</div>
-                   <div className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">Actionable Risks</div>
-                </div>
-                <div className="text-center p-6 bg-black/30 rounded-3xl border border-white/5 shadow-inner">
-                   <div className="text-4xl font-black text-amber-400">{intelligence?.intelligence.medium_risk || 0}</div>
-                   <div className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">Moderate Alerts</div>
-                </div>
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                <div>
-                   <h3 className="text-2xl font-black text-white mb-6 flex items-center gap-3 tracking-tight uppercase">
-                      <LinkIcon size={24} className="text-emerald-400" />
-                      Sector Interoperability
-                   </h3>
-                   <div className="space-y-6">
-                      {intelligence?.correlations.map((corr, i) => (
-                        <div key={i} className="bg-black/40 rounded-[32px] p-8 border-l-8 border-emerald-500 shadow-2xl">
-                           <div className="flex justify-between items-start mb-4">
-                              <h4 className="font-black text-white text-xl tracking-tight">{corr.entity_name}</h4>
-                              <span className={`px-3 py-1 text-[10px] font-black rounded-full border uppercase tracking-widest ${
-                                corr.risk_level === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 
-                                corr.risk_level === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                                'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                              }`}>{corr.risk_level} RISK</span>
+                <div className="space-y-10">
+                   <div>
+                      <h3 className="text-2xl font-black text-white mb-6 flex items-center gap-3 tracking-tight uppercase">
+                         <LinkIcon size={24} className="text-emerald-400" />
+                         Geopolitical Correlations
+                      </h3>
+                      <div className="space-y-6">
+                         {intelligence?.correlations.map((corr, i) => (
+                           <div key={i} className="bg-black/40 rounded-[32px] p-8 border-l-8 border-emerald-500 shadow-2xl">
+                              <div className="flex justify-between items-start mb-4">
+                                 <h4 className="font-black text-white text-xl tracking-tight">{corr.entity_name}</h4>
+                                 <span className={`px-3 py-1 text-[10px] font-black rounded-full border uppercase tracking-widest ${
+                                   corr.risk_level === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 
+                                   corr.risk_level === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                                   'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                 }`}>{corr.risk_level} RISK</span>
+                              </div>
+                              <p className="text-xs text-slate-400 font-bold uppercase mb-4">{corr.correlation_type}</p>
+                              <div className="bg-white/5 rounded-2xl p-4">
+                                 {corr.related_cryptos.map((rc, j) => (
+                                   <div key={j} className="flex justify-between text-sm py-1 font-bold">
+                                      <span className="text-white">{rc.symbol}</span>
+                                      <span className="text-emerald-400">{(rc.correlation_strength * 100).toFixed(0)}% STRENGTH</span>
+                                   </div>
+                                 ))}
+                              </div>
                            </div>
-                           <div className="text-[11px] text-slate-500 font-black uppercase tracking-widest mb-4">
-                              Pattern: <span className="text-emerald-300">{corr.correlation_type}</span> • Confidence: {corr.confidence}
-                           </div>
-                           <div className="bg-white/5 rounded-2xl p-5 border border-white/5">
-                              <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Linked Assets Under Scan</div>
-                              {corr.related_cryptos.map((rc, j) => (
-                                <div key={j} className="flex justify-between text-sm py-1">
-                                   <span className="text-white font-bold">{rc.symbol} - {rc.name}</span>
-                                   <span className="text-emerald-400 font-black">{(rc.correlation_strength * 100).toFixed(0)}% STRENGTH</span>
-                                </div>
-                              ))}
-                           </div>
-                        </div>
-                      ))}
-                      {!intelligence && !isAnalyzing && (
-                         <p className="text-slate-500 text-sm font-black uppercase text-center p-10 border border-dashed border-white/5 rounded-[32px]">No patterns analyzed.</p>
-                      )}
+                         ))}
+                      </div>
                    </div>
+
+                   {/* Grounding Sources Section */}
+                   {intelligence?.sources && intelligence.sources.length > 0 && (
+                     <div className="bg-black/20 rounded-[32px] p-8 border border-white/5">
+                        <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                           <Globe size={16} /> Intelligence Veracity Sources
+                        </h4>
+                        <div className="grid grid-cols-1 gap-3">
+                           {intelligence.sources.map((src, i) => (
+                             <a 
+                               key={i} 
+                               href={src.uri} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group"
+                             >
+                                <span className="text-xs font-bold text-slate-300 group-hover:text-white line-clamp-1">{src.title}</span>
+                                <ExternalLink size={14} className="text-slate-500 group-hover:text-emerald-400 shrink-0" />
+                             </a>
+                           ))}
+                        </div>
+                     </div>
+                   )}
                 </div>
 
                 <div>
                    <h3 className="text-2xl font-black text-white mb-6 flex items-center gap-3 tracking-tight uppercase">
                       <Lightbulb size={24} className="text-yellow-400" />
-                      Strategic Insights
+                      Strategic Directives
                    </h3>
                    <div className="space-y-6">
                       {intelligence?.intelligence.recommendations.map((rec, i) => (
-                        <div key={i} className="bg-black/40 rounded-[32px] p-8 border border-white/10 hover:border-emerald-500/30 transition-all duration-500 shadow-2xl group">
+                        <div key={i} className="bg-black/40 rounded-[32px] p-8 border border-white/10 hover:border-emerald-500/30 transition-all duration-500 shadow-2xl">
                            <div className="flex items-center gap-3 mb-4">
                               <span className="px-3 py-1 bg-white/10 text-white text-[9px] font-black rounded-full uppercase tracking-widest">{rec.priority}</span>
                               <h4 className="font-black text-slate-100 text-lg uppercase tracking-tight">{rec.action}</h4>
                            </div>
                            <p className="text-slate-400 text-sm mb-6 leading-relaxed font-medium">{rec.description}</p>
-                           <div className="flex items-center justify-between pt-5 border-t border-white/5">
-                              <span className="text-[10px] text-slate-500 font-black flex items-center gap-2 uppercase tracking-widest">
-                                 <BrainCircuit size={14} /> Agent: {rec.assigned_to}
-                              </span>
-                              <button className="text-[11px] font-black text-emerald-400 flex items-center gap-2 hover:text-emerald-300 transition-colors uppercase tracking-widest">
-                                 Initiate Protocol <ArrowRight size={14} />
+                           <div className="flex items-center justify-between pt-5 border-t border-white/5 text-[10px] text-slate-500 font-black uppercase tracking-widest">
+                              <span className="flex items-center gap-2"><BrainCircuit size={14} /> {rec.assigned_to}</span>
+                              <button className="text-emerald-400 flex items-center gap-2 hover:text-emerald-300">
+                                 EXECUTE <ArrowRight size={14} />
                               </button>
                            </div>
                         </div>
                       ))}
-                      {!intelligence && !isAnalyzing && (
-                        <p className="text-slate-500 text-sm font-black uppercase text-center p-10 border border-dashed border-white/5 rounded-[32px]">Consulting intelligence nodes...</p>
-                      )}
                    </div>
                 </div>
             </div>
@@ -698,7 +584,7 @@ export const Dashboard: React.FC = () => {
 
       <div className="text-center pb-12 pt-6">
          <div className="inline-block px-6 py-3 rounded-full bg-black/40 backdrop-blur-3xl border border-white/10 text-[10px] text-slate-500 font-black uppercase tracking-[0.3em] shadow-2xl">
-            System Synchronization: {new Date().toLocaleTimeString()} | Multi-Agent AI Ops v1.4
+            Multi-Agent AI Synchronized: {new Date().toLocaleTimeString()}
          </div>
       </div>
     </div>
