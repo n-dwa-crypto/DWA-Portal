@@ -15,6 +15,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install and Build 🔧
+        env:
+          # This pulls the secret from your GitHub Repo Settings
+          API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           npm install
           # Run CSV conversion before building the site

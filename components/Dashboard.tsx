@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -14,8 +14,10 @@ import {
   Loader2, 
   MapPin,
   AlertTriangle,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
+import { GoogleGenAI, Type } from "@google/genai";
 
 // --- UNIVERSAL COUNTRY LOOKUP ---
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
@@ -29,28 +31,27 @@ const getCountryName = (code: string) => {
   }
 };
 
-// --- TIER 3 MOCK DATA (High-level insights) ---
-const tier3Data = {
-  "correlations": [
-    { 
-      "entity_name": "62 Recent Sanction Changes", 
-      "correlation_type": "Temporal Pattern", 
-      "confidence": "Low", 
-      "related_cryptos": [
-        { "symbol": "SOL", "name": "Solana", "correlation_strength": 0.4 }
-      ], 
-      "risk_level": "Medium" 
-    }
-  ],
-  "intelligence": { 
-    "total_correlations": 1, 
-    "high_risk": 0, 
-    "medium_risk": 1, 
-    "recommendations": [
-      { "priority": "LOW", "action": "Routine Monitoring", "description": "Continue standard monitoring protocols", "assigned_to": "Monitoring Agent" }
-    ] 
-  }
-};
+// --- TYPES FOR INTELLIGENCE ---
+interface IntelligenceData {
+  correlations: Array<{
+    entity_name: string;
+    correlation_type: string;
+    confidence: string;
+    related_cryptos: Array<{ symbol: string; name: string; correlation_strength: number }>;
+    risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+  }>;
+  intelligence: {
+    total_correlations: number;
+    high_risk: number;
+    medium_risk: number;
+    recommendations: Array<{
+      priority: string;
+      action: string;
+      description: string;
+      assigned_to: string;
+    }>;
+  };
+}
 
 // --- HELPER COMPONENTS ---
 
@@ -124,7 +125,91 @@ export const Dashboard: React.FC = () => {
   const [cryptoStable, setCryptoStable] = useState<any[]>([]);
   const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [intelligence, setIntelligence] = useState<IntelligenceData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const runIntelligenceAnalysis = useCallback(async (sanctionsData: any[], cryptoData: any[]) => {
+    setIsAnalyzing(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const prompt = `Perform a high-level strategic intelligence analysis.
+      Context: 
+      - Sanctions List: ${JSON.stringify(sanctionsData)}
+      - Crypto Market: ${JSON.stringify(cryptoData)}
+      - Task: Generate smart strategic insights. Identify correlations between sanctioned entities/countries and specific crypto assets. 
+      - Tone: Diplomatic, professional, institutional.
+      - External Context: Consider current global affairs, geopolitical tensions, and recent financial news.
+      - Goal: Provide 2 key correlations and 2-3 strategic recommendations for an investment risk profile.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              correlations: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    entity_name: { type: Type.STRING },
+                    correlation_type: { type: Type.STRING },
+                    confidence: { type: Type.STRING },
+                    related_cryptos: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          symbol: { type: Type.STRING },
+                          name: { type: Type.STRING },
+                          correlation_strength: { type: Type.NUMBER }
+                        }
+                      }
+                    },
+                    risk_level: { type: Type.STRING, description: 'Must be LOW, MEDIUM, or HIGH' }
+                  },
+                  required: ["entity_name", "correlation_type", "confidence", "related_cryptos", "risk_level"]
+                }
+              },
+              intelligence: {
+                type: Type.OBJECT,
+                properties: {
+                  total_correlations: { type: Type.NUMBER },
+                  high_risk: { type: Type.NUMBER },
+                  medium_risk: { type: Type.NUMBER },
+                  recommendations: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        priority: { type: Type.STRING },
+                        action: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        assigned_to: { type: Type.STRING }
+                      }
+                    }
+                  }
+                },
+                required: ["total_correlations", "high_risk", "medium_risk", "recommendations"]
+              }
+            },
+            required: ["correlations", "intelligence"]
+          }
+        }
+      });
+
+      const result = JSON.parse(response.text);
+      setIntelligence(result);
+    } catch (err) {
+      console.error("AI Analysis Error:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -149,6 +234,10 @@ export const Dashboard: React.FC = () => {
         setSanctions(sanctionsData);
         setCryptoStable(stableData);
         setCryptoAlt(altData);
+
+        // Run intelligence analysis once data is loaded
+        const combinedCrypto = [...stableData, ...altData];
+        runIntelligenceAnalysis(sanctionsData, combinedCrypto);
       } catch (err: any) {
         console.warn("Failed to fetch JSON data:", err.message);
         setError("Initializing data intelligence nodes...");
@@ -158,7 +247,7 @@ export const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [runIntelligenceAnalysis]);
 
   // Calculate dynamic stats from the data
   const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
@@ -303,7 +392,7 @@ export const Dashboard: React.FC = () => {
              </div>
           </div>
 
-          {/* Market momentum Card - REDESIGNED MOMENTUM HEATMAP */}
+          {/* Market momentum Card - MOMENTUM HEATMAP */}
           <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.15)] group">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
              
@@ -512,18 +601,28 @@ export const Dashboard: React.FC = () => {
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 backdrop-blur-3xl border border-emerald-500/20 rounded-[40px] p-10 shadow-2xl">
+        <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 backdrop-blur-3xl border border-emerald-500/20 rounded-[40px] p-10 shadow-2xl relative overflow-hidden">
+            {isAnalyzing && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-500">
+                <RefreshCw size={48} className="text-emerald-400 animate-spin" />
+                <div className="text-center">
+                  <p className="text-xl font-black text-white uppercase tracking-widest">Generating AI Intelligence</p>
+                  <p className="text-xs text-emerald-300/60 font-black uppercase tracking-[0.3em] mt-2">Consulting Global Knowledge Graph...</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-6 mb-10">
                 <div className="text-center p-6 bg-black/30 rounded-3xl border border-white/5 shadow-inner">
-                   <div className="text-4xl font-black text-emerald-400">{tier3Data.intelligence.total_correlations}</div>
+                   <div className="text-4xl font-black text-emerald-400">{intelligence?.intelligence.total_correlations || 0}</div>
                    <div className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">Detected Patterns</div>
                 </div>
                 <div className="text-center p-6 bg-black/30 rounded-3xl border border-white/5 shadow-inner">
-                   <div className="text-4xl font-black text-rose-500">{tier3Data.intelligence.high_risk}</div>
+                   <div className="text-4xl font-black text-rose-500">{intelligence?.intelligence.high_risk || 0}</div>
                    <div className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">Actionable Risks</div>
                 </div>
                 <div className="text-center p-6 bg-black/30 rounded-3xl border border-white/5 shadow-inner">
-                   <div className="text-4xl font-black text-amber-400">{tier3Data.intelligence.medium_risk}</div>
+                   <div className="text-4xl font-black text-amber-400">{intelligence?.intelligence.medium_risk || 0}</div>
                    <div className="text-[10px] text-slate-500 font-black uppercase mt-1 tracking-widest">Moderate Alerts</div>
                 </div>
             </div>
@@ -535,11 +634,15 @@ export const Dashboard: React.FC = () => {
                       Sector Interoperability
                    </h3>
                    <div className="space-y-6">
-                      {tier3Data.correlations.map((corr, i) => (
+                      {intelligence?.correlations.map((corr, i) => (
                         <div key={i} className="bg-black/40 rounded-[32px] p-8 border-l-8 border-emerald-500 shadow-2xl">
                            <div className="flex justify-between items-start mb-4">
                               <h4 className="font-black text-white text-xl tracking-tight">{corr.entity_name}</h4>
-                              <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-[10px] font-black rounded-full border border-amber-500/30 uppercase tracking-widest">{corr.risk_level} RISK</span>
+                              <span className={`px-3 py-1 text-[10px] font-black rounded-full border uppercase tracking-widest ${
+                                corr.risk_level === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 
+                                corr.risk_level === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                                'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                              }`}>{corr.risk_level} RISK</span>
                            </div>
                            <div className="text-[11px] text-slate-500 font-black uppercase tracking-widest mb-4">
                               Pattern: <span className="text-emerald-300">{corr.correlation_type}</span> • Confidence: {corr.confidence}
@@ -555,6 +658,9 @@ export const Dashboard: React.FC = () => {
                            </div>
                         </div>
                       ))}
+                      {!intelligence && !isAnalyzing && (
+                         <p className="text-slate-500 text-sm font-black uppercase text-center p-10 border border-dashed border-white/5 rounded-[32px]">No patterns analyzed.</p>
+                      )}
                    </div>
                 </div>
 
@@ -564,7 +670,7 @@ export const Dashboard: React.FC = () => {
                       Strategic Insights
                    </h3>
                    <div className="space-y-6">
-                      {tier3Data.intelligence.recommendations.map((rec, i) => (
+                      {intelligence?.intelligence.recommendations.map((rec, i) => (
                         <div key={i} className="bg-black/40 rounded-[32px] p-8 border border-white/10 hover:border-emerald-500/30 transition-all duration-500 shadow-2xl group">
                            <div className="flex items-center gap-3 mb-4">
                               <span className="px-3 py-1 bg-white/10 text-white text-[9px] font-black rounded-full uppercase tracking-widest">{rec.priority}</span>
@@ -581,6 +687,9 @@ export const Dashboard: React.FC = () => {
                            </div>
                         </div>
                       ))}
+                      {!intelligence && !isAnalyzing && (
+                        <p className="text-slate-500 text-sm font-black uppercase text-center p-10 border border-dashed border-white/5 rounded-[32px]">Consulting intelligence nodes...</p>
+                      )}
                    </div>
                 </div>
             </div>
