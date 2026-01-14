@@ -129,7 +129,12 @@ const App: React.FC = () => {
         }
       });
 
-      const forecast: IntelligenceData = JSON.parse(response.text);
+      const responseText = response.text;
+      if (!responseText) {
+        throw new Error("AI returned empty response text");
+      }
+
+      const forecast: IntelligenceData = JSON.parse(responseText);
       const endTime = performance.now();
       setAnalysisTime(Math.round(endTime - startTime));
       setLatestForecast(forecast);
