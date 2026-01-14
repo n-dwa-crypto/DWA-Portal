@@ -135,9 +135,10 @@ const EntityRow: React.FC<EntityRowProps> = ({ item, type }) => (
 
 interface DashboardProps {
   userRecords?: DbRecord[];
+  userApiKey?: string;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiKey }) => {
   const [sanctions, setSanctions] = useState<any[]>([]);
   const [cryptoStable, setCryptoStable] = useState<any[]>([]);
   const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
@@ -152,10 +153,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
     return {
       correlations: [
         {
-          entity_name: "[Local] Narrative Spike",
-          correlation_type: "Heuristic Cross-Referencing",
-          confidence: "Local Mode",
-          risk_level: "HIGH",
+          entity_name: "[Local] Risk Profile",
+          correlation_type: "Heuristic Baseline",
+          confidence: "Local Offline Mode",
+          risk_level: "MEDIUM",
           related_cryptos: topVolatile.map(c => ({
             symbol: c.symbol,
             name: c.name,
@@ -165,13 +166,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
       ],
       intelligence: {
         total_correlations: 1,
-        high_risk: 1,
-        medium_risk: 0,
+        high_risk: 0,
+        medium_risk: 1,
         recommendations: [
           {
-            priority: "HIGH",
-            action: "Apply Volatility Bands",
-            description: "Local model detected unusual sentiment signals. Risk thresholds adjusted.",
+            priority: "LOW",
+            action: "Monitor Local Feed",
+            description: "Intelligence Node Offline. Using local heuristic rules for basic risk mapping.",
             assigned_to: "Base Agent"
           }
         ]
@@ -182,30 +183,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
   const runIntelligenceAnalysis = useCallback(async (sanctionsData: any[], cryptoData: any[]) => {
     setIsAnalyzing(true);
     setAiStatus('connecting');
+    setAiErrorMessage(null);
     
-    const heuristicData = generateHeuristicIntelligence(sanctionsData, cryptoData);
-    setIntelligence(heuristicData);
+    // Set initial heuristic state
+    setIntelligence(generateHeuristicIntelligence(sanctionsData, cryptoData));
+
+    const effectiveApiKey = userApiKey || process.env.API_KEY;
 
     try {
-      if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
+      if (!effectiveApiKey || effectiveApiKey === 'undefined' || effectiveApiKey === '') {
          setAiStatus('fallback');
-         setAiErrorMessage("AI Link Broken: API_KEY missing.");
+         setAiErrorMessage("Intelligence Link Inactive: No API Key provided in Admin Portal or Env.");
          setIsAnalyzing(false);
          return;
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `Act as a senior agentic intelligence strategist specializing in narrative-driven risk.
-      
-      INPUTS:
-      - Global Sanctions Context: ${JSON.stringify(sanctionsData.slice(0, 5))}
-      - Live Market Data: ${JSON.stringify(cryptoData.slice(0, 10))}
-      - RECENT USER INTEL (PRIORITY): ${JSON.stringify(userRecords.slice(0, 5))}
-      
-      TASK:
-      Correlate these datasets. If there are new user-defined news events, prioritize analyzing their impact on market volatility and sanction risk.
-      
-      Return a high-fidelity JSON analysis with 'correlations' and 'intelligence' recommendations.`;
+      const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
+      const prompt = `Perform multi-agent risk correlation. Sanctions: ${JSON.stringify(sanctionsData.slice(0,3))}. Markets: ${JSON.stringify(cryptoData.slice(0,5))}. Users: ${JSON.stringify(userRecords.slice(0,3))}. Return strictly JSON matching schema.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -268,7 +262,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
       });
 
       const responseText = response.text;
-      if (!responseText) throw new Error("Empty payload.");
+      if (!responseText) throw new Error("Empty Response");
 
       let result: IntelligenceData = JSON.parse(responseText);
       const sources: GroundingSource[] = [];
@@ -284,14 +278,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
       result.sources = sources;
       setIntelligence(result);
       setAiStatus('active');
-      setAiErrorMessage(null);
     } catch (err: any) {
       setAiStatus('error');
-      setAiErrorMessage(`AI Link Interrupted: ${err.message}`);
+      if (err.message?.includes('403') || err.message?.includes('leaked')) {
+        setAiErrorMessage("SECURITY ALERT: API Key Revoked or Forbidden. Please provide a fresh key in the Admin Portal.");
+      } else {
+        setAiErrorMessage(`Intelligence Node Error: ${err.message}`);
+      }
     } finally {
       setIsAnalyzing(false);
     }
-  }, [generateHeuristicIntelligence, userRecords]);
+  }, [generateHeuristicIntelligence, userRecords, userApiKey]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -302,7 +299,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
           fetch('data/crypto_stable.json').catch(() => fetch('./data/crypto_stable.json')),
           fetch('data/crypto_alt.json').catch(() => fetch('./data/crypto_alt.json'))
         ]);
-        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) throw new Error('Sync Required');
+        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) throw new Error('Data Sync Failure');
         const [sanctionsData, stableData, altData] = await Promise.all([
           sanctionsRes.json(), stableRes.json(), altRes.json()
         ]);
@@ -334,36 +331,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
   }, [sanctions]);
 
   return (
-    <div className="max-w-[1800px] mx-auto space-y-8 animate-in fade-in zoom-in duration-500 pb-20">
-      {/* Header */}
+    <div className="max-w-[1800px] mx-auto space-y-8 pb-20 animate-in fade-in zoom-in duration-500">
       <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden">
          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-purple-200 mb-2 tracking-tight text-white">
            Multi-Agent AI Risk Dashboard
          </h1>
          <p className="text-slate-400 font-medium">Three-Tier Agentic Intelligence System | Real-time Global Monitoring</p>
-         
-         <div className="mt-4 flex items-center justify-center gap-4">
-            <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                Live Node Feed
-            </span>
-            <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-3 py-1 rounded-full border border-white/5 uppercase tracking-widest">
-                Nodes: Sanctions | Market | Intelligence
-            </span>
-         </div>
       </div>
 
-      {/* TIER 1: ALERTS & MONITORING */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-            <span className="text-xs font-bold tracking-[0.2em] text-purple-300 uppercase">Tier 1 • Monitoring Agent</span>
+            <span className="text-xs font-bold tracking-[0.2em] text-purple-300 uppercase">Tier 1 • Monitoring</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-purple-500/20 to-rose-500/20 border border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.2)] group">
+          <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-purple-500/20 to-rose-500/20 border border-purple-500/30">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
              <div className="relative z-10 p-10 h-full flex flex-col lg:flex-row gap-10">
                 <div className="lg:w-1/2 flex flex-col justify-between">
@@ -372,39 +357,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
                        <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-300 ring-1 ring-purple-500/30 shadow-lg">
                           <Database size={24} />
                        </div>
-                       <div className="flex flex-col">
-                          <h2 className="text-xl font-black text-white leading-none uppercase tracking-tight">Global Operational Feed</h2>
-                          <span className="text-[10px] font-black text-purple-400/80 uppercase tracking-widest mt-1">Real-time sync</span>
+                       <div className="flex flex-col text-white">
+                          <h2 className="text-xl font-black leading-none uppercase tracking-tight">Global Sanctions</h2>
+                          <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest mt-1">Operational Feed</span>
                        </div>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-200 tracking-tighter mb-2">
-                        {isLoading ? "..." : sanctions.length}
-                      </div>
-                    </div>
-                    <p className="text-purple-300/60 font-bold uppercase text-[10px] tracking-[0.2em]">Total entity updates verified across network</p>
+                    <div className="text-8xl font-black text-white tracking-tighter mb-2">{isLoading ? "..." : sanctions.length}</div>
                   </div>
                 </div>
-                <div className="lg:w-1/2 flex-1 relative flex items-center justify-center">
-                  <div className="w-full h-full min-h-[300px] rounded-[32px] bg-gradient-to-br from-rose-500/10 to-transparent border border-rose-500/20 p-8 flex flex-col justify-center items-center text-center overflow-hidden">
-                    <div className="absolute top-6 right-6 animate-pulse text-rose-500"><AlertTriangle size={24} /></div>
+                <div className="lg:w-1/2 flex-1 flex items-center justify-center">
+                  <div className="w-full h-full min-h-[250px] rounded-[32px] bg-black/40 border border-white/5 p-8 flex flex-col justify-center items-center text-center">
                     {topCountry ? (
-                      <div className="animate-in fade-in zoom-in-95 duration-700 w-full flex flex-col items-center text-white">
-                        <div className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-6">Territory Risk Hotspot</div>
-                        <img 
-                          src={`https://flagcdn.com/w160/${topCountry.code.toLowerCase()}.png`} 
-                          alt={topCountry.code} 
-                          className="w-32 h-auto rounded-2xl shadow-2xl border-4 border-white/10 mb-4"
-                        />
-                        <h3 className="text-3xl font-black uppercase">{getCountryName(topCountry.code)}</h3>
+                      <div className="animate-in fade-in zoom-in duration-700 w-full flex flex-col items-center text-white">
+                        <img src={`https://flagcdn.com/w160/${topCountry.code.toLowerCase()}.png`} alt={topCountry.code} className="w-24 h-auto rounded-xl shadow-2xl mb-4" />
+                        <h3 className="text-2xl font-black uppercase tracking-tight">{getCountryName(topCountry.code)}</h3>
+                        <p className="text-[10px] text-rose-400 font-black uppercase mt-2 tracking-widest">Target Hotspot</p>
                       </div>
-                    ) : <div className="text-slate-500 font-black uppercase text-xs">Analysis in progress...</div>}
+                    ) : <div className="text-slate-500 font-black uppercase text-xs">Awaiting Data...</div>}
                   </div>
                 </div>
              </div>
           </div>
 
-          <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.15)] group">
+          <div className="relative rounded-[40px] overflow-hidden p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30">
              <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl"></div>
              <div className="relative z-10 p-10 h-full flex flex-col lg:flex-row gap-10">
                 <div className="lg:w-1/2 flex flex-col justify-between">
@@ -414,28 +389,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
                           <Activity size={24} />
                        </div>
                        <div className="flex flex-col text-white">
-                          <h2 className="text-xl font-black leading-none uppercase tracking-tight">Market Momentum</h2>
-                          <span className="text-[10px] font-black text-cyan-400/80 uppercase tracking-widest mt-1">Asset Volatility Scan</span>
+                          <h2 className="text-xl font-black leading-none uppercase tracking-tight">Market Pulse</h2>
+                          <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mt-1">Node Activity</span>
                        </div>
                     </div>
                     <div className="text-8xl font-black text-white tracking-tighter mb-2">{isLoading ? "..." : highVolatilityCount}</div>
                   </div>
                 </div>
-                <div className="lg:w-1/2 flex-1 relative flex items-center justify-center">
-                  <div className="w-full h-full min-h-[300px] rounded-[32px] bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 p-8 flex flex-col justify-center items-center text-center overflow-hidden">
-                    <div className="absolute top-6 right-6 animate-pulse text-cyan-400"><Zap size={24} /></div>
+                <div className="lg:w-1/2 flex-1 flex items-center justify-center">
+                  <div className="w-full h-full min-h-[250px] rounded-[32px] bg-black/40 border border-white/5 p-8 flex flex-col justify-center items-center text-center">
                     {mostVolatileAsset ? (
-                      <div className="animate-in fade-in zoom-in-95 duration-700 w-full flex flex-col items-center text-white">
-                        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em] mb-6">Momentum Spotlight</div>
-                        <div className="w-32 h-32 rounded-full flex items-center justify-center text-5xl font-black bg-cyan-500/10 text-cyan-400 border border-white/10 mb-6">
-                           {mostVolatileAsset.symbol}
-                        </div>
-                        <h3 className="text-3xl font-black uppercase">{mostVolatileAsset.name}</h3>
-                        <div className={`text-[11px] font-black uppercase flex items-center gap-1.5 mt-2 ${mostVolatileAsset.change_24h >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <div className="animate-in fade-in zoom-in duration-700 w-full flex flex-col items-center text-white">
+                        <div className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-black bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 mb-4">{mostVolatileAsset.symbol}</div>
+                        <h3 className="text-2xl font-black uppercase tracking-tight">{mostVolatileAsset.name}</h3>
+                        <div className={`text-[11px] font-black uppercase mt-2 ${mostVolatileAsset.change_24h >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                            {Math.abs(mostVolatileAsset.change_24h).toFixed(2)}% Velocity
                         </div>
                       </div>
-                    ) : <div className="text-slate-500 font-black uppercase text-xs">Scanning markets...</div>}
+                    ) : <div className="text-slate-500 font-black uppercase text-xs">Scanning...</div>}
                   </div>
                 </div>
              </div>
@@ -443,16 +414,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
         </div>
       </section>
 
-      {/* TIER 2: ANALYSIS WIDGETS */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-            <span className="text-xs font-bold tracking-[0.2em] text-blue-300 uppercase">Tier 2 • Analysis Agent</span>
+            <span className="text-xs font-bold tracking-[0.2em] text-blue-300 uppercase">Tier 2 • Analysis</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
           <div className="bg-black/30 backdrop-blur-xl border-l-4 border-emerald-500 rounded-r-[40px] rounded-l-md p-8 h-[500px] flex flex-col shadow-2xl">
-             <h3 className="font-black text-xl text-emerald-100 flex items-center gap-2 uppercase tracking-tight mb-6 text-white">
+             <h3 className="font-black text-xl text-white flex items-center gap-2 uppercase tracking-tight mb-6">
                 <ShieldAlert size={20} className="text-emerald-500" />
                 Sanctions Log
              </h3>
@@ -462,7 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
           </div>
           <div className="space-y-6">
              <div className="bg-black/30 backdrop-blur-xl border-l-4 border-amber-500 rounded-r-[40px] rounded-l-md p-8 h-[240px] flex flex-col shadow-2xl">
-                <h3 className="font-black text-xl text-amber-100 flex items-center gap-2 uppercase tracking-tight mb-4 text-white">
+                <h3 className="font-black text-xl text-white flex items-center gap-2 uppercase tracking-tight mb-4">
                    <Bitcoin size={20} className="text-amber-500" />
                    Crypto Coins
                 </h3>
@@ -471,7 +441,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
                 </div>
              </div>
              <div className="bg-black/30 backdrop-blur-xl border-l-4 border-indigo-500 rounded-r-[40px] rounded-l-md p-8 h-[240px] flex flex-col shadow-2xl">
-                <h3 className="font-black text-xl text-indigo-100 flex items-center gap-2 uppercase tracking-tight mb-4 text-white">
+                <h3 className="font-black text-xl text-white flex items-center gap-2 uppercase tracking-tight mb-4">
                    <Globe size={20} className="text-indigo-500" />
                    Crypto Tokens
                 </h3>
@@ -483,7 +453,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
         </div>
       </section>
 
-      {/* TIER 3: INTELLIGENCE */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
@@ -502,74 +471,63 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [] }) => {
                     ) : (
                       <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full">
                          <WifiOff size={16} className="text-amber-400" />
-                         <span className="text-[10px] font-black text-amber-200 uppercase tracking-widest">Heuristic Fallback Active</span>
+                         <span className="text-[10px] font-black text-amber-200 uppercase tracking-widest">Heuristic Fallback</span>
                       </div>
                     )}
                 </div>
                 {isAnalyzing && (
                   <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full animate-pulse">
                     <Loader2 size={16} className="text-emerald-400 animate-spin" />
-                    <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">Analyzing Live Data...</p>
+                    <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">Analyzing Feed...</p>
                   </div>
                 )}
             </div>
 
             {aiErrorMessage && (
-              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-3">
-                  <AlertCircle size={18} className="text-rose-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-rose-200 font-mono">{aiErrorMessage}</p>
+              <div className="mb-6 p-6 bg-rose-500/10 border border-rose-500/20 rounded-[32px] flex items-start gap-4 animate-in fade-in slide-in-from-top-4">
+                  <AlertCircle size={24} className="text-rose-400 shrink-0 mt-1" />
+                  <div>
+                    <p className="text-sm font-bold text-rose-100 mb-1">Intelligence Sync Failed</p>
+                    <p className="text-xs text-rose-300 leading-relaxed font-mono">{aiErrorMessage}</p>
+                  </div>
               </div>
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                <div className="space-y-10">
-                   <div>
-                      <h3 className="text-2xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                         <LinkIcon size={24} className="text-emerald-400" />
-                         Detected Correlations
-                      </h3>
-                      <div className="space-y-6">
-                         {(intelligence?.correlations || []).map((corr, i) => (
-                           <div key={i} className="bg-black/40 rounded-[32px] p-8 border-l-8 border-emerald-500 shadow-2xl">
-                              <div className="flex justify-between items-start mb-1">
-                                 <h4 className="font-black text-white text-xl">{corr.entity_name}</h4>
-                                 <span className={`px-3 py-1 text-[10px] font-black rounded-full border uppercase ${
-                                   corr.risk_level === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 
-                                   'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                                 }`}>{corr.risk_level} RISK</span>
-                              </div>
-                              <p className="text-xs text-emerald-400 font-bold uppercase mb-4 opacity-80">Narrative Analytics Trigger</p>
-                              <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-                                    {corr.related_cryptos.map((rc, j) => (
-                                      <div key={j} className="bg-white/5 rounded-2xl p-4 flex justify-between items-center text-white">
-                                         <span className="text-sm font-black">{rc.symbol} - {rc.name}</span>
-                                         <span className="text-[10px] font-black text-emerald-400 uppercase">Impact: {(rc.correlation_strength * 100).toFixed(0)}%</span>
-                                      </div>
-                                    ))}
-                              </div>
-                           </div>
-                         ))}
-                      </div>
-                   </div>
-                   <div>
-                      <h3 className="text-2xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                         💡 Actionable Intelligence
-                      </h3>
-                      <div className="space-y-6">
-                         {(intelligence?.intelligence.recommendations || []).map((rec, i) => (
-                           <div key={i} className="bg-black/40 rounded-[32px] p-8 border border-white/10 hover:border-emerald-500/30 transition-all shadow-2xl">
-                              <h4 className="font-black text-slate-100 text-lg uppercase mb-4">
-                                 [{rec.priority}] {rec.action}
-                              </h4>
-                              <p className="text-slate-400 text-sm mb-6 leading-relaxed font-medium">{rec.description}</p>
-                              <div className="flex items-center justify-between pt-5 border-t border-white/5 text-[10px] text-slate-500 font-black uppercase">
-                                 <span className="flex items-center gap-2"><BrainCircuit size={14} /> Agent: {rec.assigned_to}</span>
-                                 <button className="text-emerald-400 flex items-center gap-2 hover:text-emerald-300 transition-colors uppercase">EXECUTE <ArrowRight size={14} /></button>
-                              </div>
-                           </div>
-                         ))}
-                      </div>
-                   </div>
+                <div className="space-y-6">
+                   <h3 className="text-xl font-black text-white flex items-center gap-3 uppercase tracking-tight">
+                      <LinkIcon size={20} className="text-emerald-400" /> Correlations
+                   </h3>
+                   {(intelligence?.correlations || []).map((corr, i) => (
+                     <div key={i} className="bg-black/40 rounded-[32px] p-8 border-l-8 border-emerald-500 shadow-2xl">
+                        <div className="flex justify-between items-start mb-4">
+                           <h4 className="font-black text-white text-xl">{corr.entity_name}</h4>
+                           <span className={`px-3 py-1 text-[10px] font-black rounded-full border uppercase ${
+                             corr.risk_level === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 
+                             'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                           }`}>{corr.risk_level} IMPACT</span>
+                        </div>
+                        <div className="space-y-2">
+                              {corr.related_cryptos.map((rc, j) => (
+                                <div key={j} className="bg-white/5 rounded-2xl p-4 flex justify-between items-center text-white">
+                                   <span className="text-sm font-black">{rc.symbol}</span>
+                                   <span className="text-[10px] font-black text-emerald-400">Impact: {(rc.correlation_strength * 100).toFixed(0)}%</span>
+                                </div>
+                              ))}
+                        </div>
+                     </div>
+                   ))}
+                </div>
+                <div className="space-y-6">
+                   <h3 className="text-xl font-black text-white flex items-center gap-3 uppercase tracking-tight">
+                      💡 Insights
+                   </h3>
+                   {(intelligence?.intelligence.recommendations || []).map((rec, i) => (
+                     <div key={i} className="bg-black/40 rounded-[32px] p-8 border border-white/5 hover:border-emerald-500/30 transition-all shadow-2xl">
+                        <h4 className="font-black text-slate-100 uppercase mb-2">[{rec.priority}] {rec.action}</h4>
+                        <p className="text-slate-400 text-sm leading-relaxed font-medium">{rec.description}</p>
+                     </div>
+                   ))}
                 </div>
             </div>
         </div>

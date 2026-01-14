@@ -20,7 +20,12 @@ import {
   TrendingUp,
   ShieldAlert,
   ArrowRight,
-  Cpu
+  Cpu,
+  Lock,
+  Key,
+  Eye,
+  EyeOff,
+  CheckCircle2
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -31,13 +36,34 @@ const App: React.FC = () => {
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Intelligence states for immediate feedback in Admin Portal
+  // API Key Management
+  const [userApiKey, setUserApiKey] = useState<string>(localStorage.getItem('dwa_user_api_key') || '');
+  const [showKey, setShowKey] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
+
   const [latestForecast, setLatestForecast] = useState<IntelligenceData | null>(null);
   const [isForecasting, setIsForecasting] = useState(false);
   const [forecastStatus, setForecastStatus] = useState<AIStatus>('connecting');
   const [analysisTime, setAnalysisTime] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
+
+  const handleSaveKey = () => {
+    localStorage.setItem('dwa_user_api_key', userApiKey);
+    setKeySaved(true);
+    setTimeout(() => setKeySaved(false), 3000);
+    
+    // Attempt to re-run intelligence with new key if news exists
+    const lastNews = records.find(r => r.type === RecordType.NEWS);
+    if (lastNews) {
+      analyzeNewsImpact(lastNews.content);
+    }
+  };
+
+  const getEffectiveApiKey = () => {
+    return userApiKey || process.env.API_KEY || '';
+  };
 
   const refreshData = useCallback(async () => {
     setIsLoadingFeed(true);
@@ -51,31 +77,23 @@ const App: React.FC = () => {
   }, []);
 
   const analyzeNewsImpact = async (content: string) => {
+    const apiKey = getEffectiveApiKey();
+    if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+      setForecastStatus('fallback');
+      setErrorMessage("Missing Intelligence Link: No API Key detected. Please configure in Admin Portal.");
+      return;
+    }
+
     setIsForecasting(true);
     setForecastStatus('connecting');
+    setErrorMessage(null);
     const startTime = performance.now();
     
     try {
-      if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
-        setForecastStatus('fallback');
-        setAnalysisTime(450); // Simulated delay for heuristic
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `Act as an elite high-frequency market intelligence agent. 
-      A new event just occurred: "${content}"
-      
-      IMMEDIATE TASK:
-      1. Predict price volatility for BTC, ETH, and SOL.
-      2. Identify correlation types (e.g., Geopolitical, Institutional, Social).
-      3. Provide 2-3 specific risk-mitigation recommendations.
-      
-      Return the analysis in JSON format matching the intelligence schema.`;
-
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview", // Using flash for maximum speed
-        contents: prompt,
+        model: "gemini-3-flash-preview",
+        contents: `Act as a high-frequency market intelligence agent. Analyze: "${content}". Return JSON.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -130,28 +148,35 @@ const App: React.FC = () => {
       });
 
       const responseText = response.text;
-      if (!responseText) {
-        throw new Error("AI returned empty response text");
-      }
+      if (!responseText) throw new Error("Empty AI Response");
 
       const forecast: IntelligenceData = JSON.parse(responseText);
       const endTime = performance.now();
       setAnalysisTime(Math.round(endTime - startTime));
       setLatestForecast(forecast);
       setForecastStatus('active');
-    } catch (e) {
+    } catch (e: any) {
       console.error("Impact Analysis Error:", e);
       setForecastStatus('error');
+      if (e.message?.includes('403') || e.message?.includes('leaked')) {
+        setErrorMessage("API Key Error: Invalid or Leaked Key. Update credentials in settings.");
+      } else {
+        setErrorMessage(e.message || "Failed to connect to Intelligence Node.");
+      }
     } finally {
       setIsForecasting(false);
     }
   };
 
   const handleAddRecord = async (type: RecordType, content: string) => {
-    await dbService.addRecord(type, content);
-    await refreshData();
-    if (type === RecordType.NEWS) {
-      analyzeNewsImpact(content);
+    try {
+      await dbService.addRecord(type, content);
+      await refreshData();
+      if (type === RecordType.NEWS) {
+        analyzeNewsImpact(content);
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -210,10 +235,13 @@ const App: React.FC = () => {
         <div className="p-6">
            <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                 <Cpu size={12} /> Intelligence Nodes Active
+                 <Cpu size={12} /> System Node Config
               </div>
-              <div className="flex gap-1">
-                 {[1,2,3,4,5].map(n => <div key={n} className="h-1 flex-1 bg-teal-500/40 rounded-full animate-pulse" style={{animationDelay: `${n*200}ms`}}></div>)}
+              <div className="flex items-center gap-2">
+                 <div className={`w-2 h-2 rounded-full ${userApiKey ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                   {userApiKey ? 'Custom Key Active' : 'System Default'}
+                 </span>
               </div>
            </div>
         </div>
@@ -230,10 +258,63 @@ const App: React.FC = () => {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-10 scroll-smooth custom-scrollbar">
-          {activeTab === 'dashboard' && <Dashboard userRecords={records} />}
+          {activeTab === 'dashboard' && <Dashboard userRecords={records} userApiKey={userApiKey} />}
 
           {activeTab === 'portal' && (
             <div className="max-w-7xl mx-auto space-y-10 pb-20">
+              
+              {/* API KEY CONFIGURATION WIDGET */}
+              <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 p-8 shadow-2xl relative overflow-hidden group hover:border-blue-500/30 transition-all">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 relative z-10">
+                      <div className="flex items-center gap-5">
+                          <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-white/10">
+                              <Key size={28} />
+                          </div>
+                          <div>
+                              <h3 className="text-xl font-black text-white uppercase tracking-tight">Intelligence Configuration</h3>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 opacity-70">Manage Local Agent Credentials</p>
+                          </div>
+                      </div>
+                      <div className="flex gap-2">
+                          {userApiKey && (
+                             <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[9px] font-black text-emerald-400 uppercase flex items-center gap-1.5">
+                                <ShieldAlert size={10} /> Local Override
+                             </div>
+                          )}
+                      </div>
+                  </div>
+
+                  <div className="relative z-10 space-y-4">
+                      <div className="relative">
+                          <input 
+                              type={showKey ? "text" : "password"}
+                              value={userApiKey}
+                              onChange={(e) => setUserApiKey(e.target.value)}
+                              placeholder="Enter Gemini API Key..."
+                              className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-6 pr-14 text-white font-mono text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600 transition-all"
+                          />
+                          <button 
+                              onClick={() => setShowKey(!showKey)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white transition-colors"
+                          >
+                              {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                      </div>
+                      <div className="flex flex-col md:flex-row justify-between items-center gap-4 px-2">
+                          <p className="text-[10px] text-slate-500 font-bold max-w-md">Your key is stored locally in your browser. Use Referrer Restrictions in GCP Console to secure public deployments.</p>
+                          <button 
+                            onClick={handleSaveKey}
+                            className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${
+                                keySaved ? 'bg-emerald-500 text-white' : 'bg-blue-600 hover:bg-blue-50 text-white shadow-lg shadow-blue-500/20'
+                            }`}
+                          >
+                              {keySaved ? <CheckCircle2 size={14} /> : <RefreshCw size={14} />}
+                              {keySaved ? 'Credentials Updated' : 'Apply Settings'}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <ActionWidget 
                   type={RecordType.NEWS}
@@ -249,12 +330,8 @@ const App: React.FC = () => {
                 />
               </div>
 
-              {/* IMMEDIATE AI IMPACT PANEL */}
-              <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 backdrop-blur-3xl border border-blue-500/30 rounded-[40px] p-8 shadow-2xl relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-                      <BrainCircuit size={140} className="text-blue-400" />
-                  </div>
-                  
+              {/* AI IMPACT PANEL */}
+              <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 backdrop-blur-3xl border border-blue-500/30 rounded-[40px] p-8 shadow-2xl relative overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 relative z-10">
                       <div>
                         <div className="flex items-center gap-3 mb-2">
@@ -263,7 +340,6 @@ const App: React.FC = () => {
                         </div>
                         <p className="text-blue-200/50 font-bold text-[10px] uppercase tracking-[0.2em]">Automated Intelligence Forecasting</p>
                       </div>
-                      
                       <div className="flex items-center gap-3">
                           {analysisTime && !isForecasting && (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full animate-in fade-in zoom-in">
@@ -272,16 +348,26 @@ const App: React.FC = () => {
                             </div>
                           )}
                           <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${
-                            forecastStatus === 'active' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                            forecastStatus === 'active' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                           }`}>
-                            {isForecasting ? <RefreshCw size={14} className="animate-spin" /> : <ShieldAlert size={14} />}
-                            {isForecasting ? 'Agent Reasoning...' : 'System Synchronized'}
+                            {isForecasting ? <RefreshCw size={14} className="animate-spin" /> : <Lock size={14} />}
+                            {isForecasting ? 'Agent Reasoning...' : (errorMessage ? 'Security Alert' : 'Node Ready')}
                           </div>
                       </div>
                   </div>
 
-                  {!latestForecast && !isForecasting && (
-                    <div className="h-48 flex flex-col items-center justify-center text-slate-600 border border-dashed border-white/10 rounded-3xl bg-black/20 group-hover:bg-black/40 transition-colors">
+                  {errorMessage && (
+                    <div className="mb-6 p-6 bg-rose-500/10 border border-rose-500/20 rounded-3xl flex items-start gap-4 animate-in fade-in zoom-in">
+                        <AlertTriangle size={24} className="text-rose-400 shrink-0 mt-1" />
+                        <div>
+                           <p className="text-sm font-bold text-rose-200 mb-1">Intelligence Link Interrupted</p>
+                           <p className="text-xs text-rose-300/70 leading-relaxed font-mono">{errorMessage}</p>
+                        </div>
+                    </div>
+                  )}
+
+                  {!latestForecast && !isForecasting && !errorMessage && (
+                    <div className="h-48 flex flex-col items-center justify-center text-slate-600 border border-dashed border-white/10 rounded-3xl bg-black/20">
                         <AlertTriangle size={32} className="mb-4 opacity-10" />
                         <p className="font-black uppercase text-[10px] tracking-[0.3em]">Awaiting Data Feed for Impact Projection</p>
                     </div>
@@ -296,15 +382,15 @@ const App: React.FC = () => {
                     </div>
                   )}
 
-                  {latestForecast && !isForecasting && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-500 relative z-10">
+                  {latestForecast && !isForecasting && !errorMessage && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-6 relative z-10">
                         <div className="space-y-4">
                             <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
                                <TrendingUp size={14} /> Asset Volatility Prediction
                             </h4>
                             <div className="grid grid-cols-1 gap-3">
                               {latestForecast.correlations.map((corr, i) => (
-                                  <div key={i} className="bg-white/5 border border-white/10 p-5 rounded-2xl flex justify-between items-center group/item hover:bg-white/10 transition-all">
+                                  <div key={i} className="bg-white/5 border border-white/10 p-5 rounded-2xl flex justify-between items-center hover:bg-white/10 transition-all">
                                       <div>
                                           <p className="text-sm font-black text-white">{corr.entity_name}</p>
                                           <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">{corr.correlation_type}</p>
@@ -328,11 +414,6 @@ const App: React.FC = () => {
                                           <span className="text-[9px] font-black text-amber-500/60 uppercase">{rec.priority} PRIORITY</span>
                                       </div>
                                       <p className="text-[11px] text-slate-400 leading-relaxed font-medium">{rec.description}</p>
-                                      <div className="mt-3 flex justify-end">
-                                         <button className="text-[9px] font-black text-blue-400 uppercase flex items-center gap-1 hover:text-blue-300">
-                                            Apply Node <ArrowRight size={10} />
-                                         </button>
-                                      </div>
                                   </div>
                               ))}
                             </div>
@@ -347,11 +428,11 @@ const App: React.FC = () => {
             <div className="max-w-5xl mx-auto pb-20">
                <div className="mb-8 flex items-center justify-between">
                     <div>
-                      <h3 className="text-2xl font-bold text-white tracking-tight">System Ledger</h3>
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Audit Trail Active</p>
+                      <h3 className="text-2xl font-bold text-white tracking-tight">Audit Trail</h3>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">System Wide Events</p>
                     </div>
                     <button onClick={refreshData} className="text-[10px] font-black uppercase tracking-widest px-6 py-2.5 bg-white/5 rounded-full border border-white/10 hover:bg-white/10 transition-colors flex items-center gap-2">
-                       <RefreshCw size={14} /> Sync Ledger
+                       <RefreshCw size={14} /> Re-sync
                     </button>
                </div>
                <Feed items={records} loading={isLoadingFeed} />
