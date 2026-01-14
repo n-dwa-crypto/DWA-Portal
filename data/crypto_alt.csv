@@ -1,6 +1,26 @@
 rank,symbol,name,price,change_24h
-4,BNB,BNB,1146.82,2.77
-5,XRP,XRP,2.39,2.56
-6,SOL,Solana,177.59,-6.51
-9,DOGE,Dogecoin,0.18,-3.88
-12,HYPE,Hyperliquid,37.34,-4.54
+11,BNB,BNB,612.45,1.20
+12,DOGE,Dogecoin,0.16,-4.50
+13,TRX,TRON,0.20,0.85
+14,HYPE,Hyperliquid,34.82,-2.15
+15,LINK,Chainlink,18.25,2.15
+16,SUI,Sui,1.85,7.20
+17,LTC,Litecoin,92.40,0.30
+18,XMR,Monero,162.15,-0.10
+19,UNI,Uniswap,12.40,-3.20
+20,NEAR,NEAR Protocol,5.22,5.10
+21,AAVE,Aave,148.50,-1.15
+22,PEPE,Pepe,0.000009,12.40
+23,BONK,Bonk,0.000028,8.10
+24,GRT,The Graph,0.22,1.10
+25,JUP,Jupiter,0.92,4.50
+26,RENDER,Render,7.45,6.20
+27,STX,Stacks,1.95,3.15
+28,PYTH,Pyth Network,0.42,-2.15
+29,TON,Toncoin,5.15,1.40
+30,MATIC,Polygon,0.56,0.45
+31,BCH,Bitcoin Cash,420.50,1.25
+32,STLR,Stellar,0.11,-0.80
+33,HBAR,Hedera,0.07,1.50
+34,ARB,Arbitrum,0.94,-2.30
+35,APT,Aptos,8.12,-1.10
