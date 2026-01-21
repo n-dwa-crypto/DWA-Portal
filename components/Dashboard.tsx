@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -140,17 +140,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // News Analysis State
+  // Intelligence State
   const [latestForecast, setLatestForecast] = useState<IntelligenceData | null>(null);
   const [isForecasting, setIsForecasting] = useState(false);
   const [forecastStatus, setForecastStatus] = useState<AIStatus>('connecting');
   const [analysisTime, setAnalysisTime] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Caching mechanism to prevent redundant API calls on focus/re-render
+  const lastAnalyzedRef = useRef<{ id: string | null; content: string | null }>({ id: null, content: null });
+
   const sanitizeApiKey = (key: string | undefined): string => {
     if (!key) return '';
     const clean = String(key).trim().replace(/[\n\r\t]/g, '');
     if (clean === 'undefined' || clean === 'null' || !clean) return '';
+    // Strip any non-printable ASCII characters that break Headers.append
     return clean.replace(/[^\x20-\x7E]/g, '');
   };
 
@@ -158,11 +162,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     return sanitizeApiKey(userApiKey || process.env.API_KEY);
   }, [userApiKey]);
 
-  const analyzeNewsImpact = useCallback(async (content: string) => {
+  const analyzeNewsImpact = useCallback(async (content: string, recordId: string) => {
+    // 1. Strict Cache Check: If this specific record has already been analyzed, abort.
+    if (lastAnalyzedRef.current.id === recordId && lastAnalyzedRef.current.content === content) {
+      console.debug("Intelligence cache hit for:", recordId);
+      return;
+    }
+
     const apiKey = getEffectiveApiKey();
     if (!apiKey) {
       setForecastStatus('fallback');
-      setErrorMessage("Intelligence Link Inactive: No API key detected.");
+      setErrorMessage("Intelligence Node Offline: No API credentials found.");
       return;
     }
 
@@ -173,8 +183,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     
     try {
       const ai = new GoogleGenAI({ apiKey: apiKey });
-      const prompt = `Act as a high-frequency market intelligence agent. Analyze this crypto news for potential entity correlations and market risks: "${content}". 
-      Return strictly JSON matching this schema:
+      const prompt = `Act as a senior market risk intelligence agent. High-intensity analysis required for this crypto news: "${content}". 
+      Cross-reference with volatility in tokens like BTC, ETH, SOL, HYPE, SUI, LINK.
+      Output MUST be strict JSON.
+      
+      Schema:
       {
         "correlations": [{"entity_name": string, "correlation_type": string, "confidence": "HIGH"|"MEDIUM"|"LOW", "related_cryptos": [{"symbol": string, "name": string, "correlation_strength": number}], "risk_level": "LOW"|"MEDIUM"|"HIGH"}],
         "intelligence": {"total_correlations": number, "high_risk": number, "medium_risk": number, "recommendations": [{"priority": "HIGH"|"MEDIUM"|"LOW", "action": string, "description": string, "assigned_to": string}]}
@@ -240,16 +253,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       });
 
       const responseText = response.text;
-      if (!responseText) throw new Error("Empty AI Response Signal");
+      if (!responseText) throw new Error("Empty Neural Transmission");
 
       const forecast: IntelligenceData = JSON.parse(responseText);
       const endTime = performance.now();
+      
       setAnalysisTime(Math.round(endTime - startTime));
       setLatestForecast(forecast);
       setForecastStatus('active');
+      
+      // Update cache ref
+      lastAnalyzedRef.current = { id: recordId, content };
+      
     } catch (e: any) {
       setForecastStatus('error');
-      setErrorMessage(e.message || "Intelligence Link Failure: Connection timeout.");
+      setErrorMessage(e.message || "Intelligence Link Failure: Connection timed out.");
     } finally {
       setIsForecasting(false);
     }
@@ -280,13 +298,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     fetchData();
   }, []);
 
-  // Trigger analysis when latest news changes
+  // Trigger analysis ONLY when latest news changes
   useEffect(() => {
     const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
     if (latestNews) {
-      analyzeNewsImpact(latestNews.content);
+      analyzeNewsImpact(latestNews.content, latestNews.id);
     }
-  }, [userRecords, analyzeNewsImpact, userApiKey]);
+  }, [userRecords, analyzeNewsImpact]);
 
   const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
   const highVolatilityCount = useMemo(() => allCrypto.filter(c => Math.abs(c.change_24h) > 5).length, [allCrypto]);
@@ -304,20 +322,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
 
   return (
     <div className="max-w-[1800px] mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
-      {/* Dashboard Header */}
+      {/* Header */}
       <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden group">
          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-indigo-500"></div>
          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-emerald-200 mb-2 tracking-tight text-white group-hover:scale-[1.01] transition-transform duration-700">
            DWA Market Intelligence
          </h1>
-         <p className="text-slate-400 font-medium opacity-80 uppercase tracking-widest text-[10px] font-black">Agentic Risk Node | Real-time CSV & News Integration</p>
+         <p className="text-slate-400 font-medium opacity-80 uppercase tracking-widest text-[10px] font-black">AI Risk Node | News & Multi-Feed Integration</p>
       </div>
 
       {/* Tier 1 monitoring stats */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 1 • Global Monitoring</span>
+            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 1 • Operational Monitoring</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
         </div>
 
@@ -333,7 +351,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                        </div>
                        <div className="flex flex-col text-white">
                           <h2 className="text-xl font-black leading-none uppercase tracking-tight">Global Sanctions</h2>
-                          <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest mt-1">Operational Feed</span>
+                          <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest mt-1">Registry Feed</span>
                        </div>
                     </div>
                     <div className="text-8xl font-black text-white tracking-tighter mb-2">{isLoading ? "..." : sanctions.length}</div>
@@ -347,7 +365,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                         <h3 className="text-xl font-black uppercase tracking-tight">{getCountryName(topCountry.code)}</h3>
                         <p className="text-[10px] text-rose-400 font-black uppercase mt-2 tracking-widest">{topCountry.count} Entities Logged</p>
                       </div>
-                    ) : <div className="text-slate-500 font-black uppercase text-xs">Waiting for Node Sync...</div>}
+                    ) : <div className="text-slate-500 font-black uppercase text-xs">Waiting for Data Sync...</div>}
                   </div>
                 </div>
              </div>
@@ -364,7 +382,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                        </div>
                        <div className="flex flex-col text-white">
                           <h2 className="text-xl font-black leading-none uppercase tracking-tight">Market Pulse</h2>
-                          <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mt-1">Active Volatility</span>
+                          <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mt-1">Volatility Scan</span>
                        </div>
                     </div>
                     <div className="text-8xl font-black text-white tracking-tighter mb-2">{isLoading ? "..." : highVolatilityCount}</div>
@@ -380,7 +398,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                            {Math.abs(mostVolatileAsset.change_24h).toFixed(2)}% Intensity
                         </div>
                       </div>
-                    ) : <div className="text-slate-500 font-black uppercase text-xs">Scanning Market Node...</div>}
+                    ) : <div className="text-slate-500 font-black uppercase text-xs">Scanning Node...</div>}
                   </div>
                 </div>
              </div>
@@ -392,7 +410,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 2 • Deep Analysis</span>
+            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 2 • Deep Intelligence</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
         </div>
         
@@ -431,7 +449,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         </div>
       </section>
 
-      {/* Tier 3 • Intelligence Agent (Relocated Live Impact Analysis) */}
+      {/* Tier 3 Relocated Intelligence Widget */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
@@ -455,10 +473,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                   ) : forecastStatus === 'connecting' ? (
                     <div className="flex items-center gap-2 px-6 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-full">
                        <Loader2 size={20} className="text-blue-400 animate-spin" />
-                       <span className="text-[11px] font-black text-blue-200 uppercase tracking-[0.2em]">Synthesizing...</span>
+                       <span className="text-[11px] font-black text-blue-200 uppercase tracking-[0.2em]">Neural Syncing...</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 px-6 py-2.5 bg-rose-500/10 border border-rose-500/30 rounded-full">
+                    <div className="flex items-center gap-2 px-6 py-2.5 bg-rose-500/10 border border-rose-500/30 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.1)]">
                        <AlertTriangle size={20} className="text-rose-400" />
                        <span className="text-[11px] font-black text-rose-200 uppercase tracking-[0.2em]">Agent Offline</span>
                     </div>
@@ -475,10 +493,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                   <button 
                     onClick={() => {
                       const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
-                      if (latestNews) analyzeNewsImpact(latestNews.content);
+                      if (latestNews) {
+                        // Clear cache manually to force a fresh analysis
+                        lastAnalyzedRef.current = { id: null, content: null };
+                        analyzeNewsImpact(latestNews.content, latestNews.id);
+                      }
                     }}
                     className="p-3 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all hover:scale-110 active:rotate-180 duration-500 shadow-xl"
-                    title="Force Global Risk Sync"
+                    title="Force Signal Refresh"
                   >
                     <RefreshCw size={18} className={isForecasting ? 'animate-spin' : ''} />
                   </button>
@@ -488,7 +510,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
           {!latestForecast && !isForecasting && !errorMessage && (
             <div className="h-64 flex flex-col items-center justify-center text-slate-500 border border-dashed border-white/10 rounded-[32px] bg-black/20">
                 <BrainCircuit size={48} className="opacity-20 mb-4" />
-                <p className="font-black uppercase text-[10px] tracking-[0.3em]">Awaiting News Feed to Trigger Neural Analysis</p>
+                <p className="font-black uppercase text-[10px] tracking-[0.3em]">Awaiting Data Feed to Trigger Agentic Inference</p>
             </div>
           )}
 
@@ -496,7 +518,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
             <div className="h-64 flex items-center justify-center bg-black/40 rounded-[32px] border border-white/5">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-                    <span className="text-[11px] font-black text-blue-300 uppercase tracking-[0.3em] animate-pulse">Establishing Link to Agentic Core...</span>
+                    <span className="text-[11px] font-black text-blue-300 uppercase tracking-[0.3em] animate-pulse">Consulting Neural Compliance Node...</span>
                 </div>
             </div>
           )}
@@ -504,12 +526,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
           {errorMessage && (
             <div className="h-64 flex flex-col items-center justify-center text-rose-500/50 border border-dashed border-rose-500/20 rounded-[32px] bg-rose-500/5 p-8 text-center">
                 <AlertCircle size={48} className="opacity-40 mb-4" />
-                <p className="font-black uppercase text-[10px] tracking-[0.2em] mb-2">Neural Node Connection Interrupted</p>
+                <p className="font-black uppercase text-[10px] tracking-[0.2em] mb-2">Signal Connection Failure</p>
                 <p className="text-xs text-rose-300/60 font-medium max-w-sm mb-6">{errorMessage}</p>
                 <button onClick={() => {
                    const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
-                   if (latestNews) analyzeNewsImpact(latestNews.content);
-                }} className="text-[10px] font-black uppercase tracking-widest text-white px-6 py-2.5 bg-rose-500 rounded-full hover:bg-rose-600 transition-colors">Retry Sync</button>
+                   if (latestNews) {
+                     lastAnalyzedRef.current = { id: null, content: null };
+                     analyzeNewsImpact(latestNews.content, latestNews.id);
+                   }
+                }} className="text-[10px] font-black uppercase tracking-widest text-white px-6 py-2.5 bg-rose-500 rounded-full hover:bg-rose-600 transition-colors">Retry Handshake</button>
             </div>
           )}
 
@@ -517,7 +542,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in slide-in-from-bottom-8 relative z-10">
                 <div className="space-y-6">
                     <h3 className="text-xl font-black text-white flex items-center gap-3 uppercase tracking-tight mb-8">
-                       <LinkIcon size={22} className="text-emerald-400" /> High-Confidence Correlations
+                       <LinkIcon size={22} className="text-emerald-400" /> Entity Proximity Matrix
                     </h3>
                     <div className="grid grid-cols-1 gap-4">
                       {latestForecast.correlations.map((corr, i) => (
@@ -577,7 +602,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                               
                               <div className="pt-6 border-t border-white/5 flex items-center justify-between">
                                   <div className="flex items-center gap-2">
-                                    <MapPin size={12} className="text-slate-600" />
+                                    <Zap size={12} className="text-slate-600" />
                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assignee: {rec.assigned_to}</span>
                                   </div>
                                   <ArrowRight size={16} className="text-slate-700 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
