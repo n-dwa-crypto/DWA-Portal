@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { dbService } from './services/mockDb';
 import { ConnectionStatus, DbRecord, RecordType, SystemStats } from './types';
@@ -18,7 +19,6 @@ import {
   AlertTriangle,
   Clock,
   TrendingUp,
-  ShieldAlert,
   ArrowRight,
   Cpu,
   Lock,
@@ -63,11 +63,23 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
 
+  const sanitizeApiKey = (key: string | undefined): string => {
+    if (!key) return '';
+    const clean = String(key).trim().replace(/[\n\r\t]/g, '');
+    if (clean === 'undefined' || clean === 'null' || !clean) return '';
+    // Strip any non-printable ASCII characters that break Headers.append
+    return clean.replace(/[^\x20-\x7E]/g, '');
+  };
+
   useEffect(() => {
     const checkKey = async () => {
       if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setHasGoogleKey(hasKey);
+        try {
+          const hasKey = await window.aistudio.hasSelectedApiKey();
+          setHasGoogleKey(hasKey);
+        } catch (e) {
+          console.debug("Optional key check failed");
+        }
       }
     };
     checkKey();
@@ -102,7 +114,7 @@ const App: React.FC = () => {
   };
 
   const getEffectiveApiKey = () => {
-    return userApiKey || process.env.API_KEY || '';
+    return sanitizeApiKey(userApiKey || process.env.API_KEY);
   };
 
   const refreshData = useCallback(async () => {
@@ -118,9 +130,9 @@ const App: React.FC = () => {
 
   const analyzeNewsImpact = async (content: string) => {
     const apiKey = getEffectiveApiKey();
-    if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+    if (!apiKey) {
       setForecastStatus('fallback');
-      setErrorMessage("Intelligence Link Inactive: No API key detected. Please link your Google Account in the Admin Portal.");
+      setErrorMessage("Intelligence Link Inactive: No API key detected.");
       return;
     }
 
@@ -132,58 +144,15 @@ const App: React.FC = () => {
     try {
       const ai = new GoogleGenAI({ apiKey: apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Act as a high-frequency market intelligence agent. Analyze: "${content}". Return JSON only.`,
+        model: 'gemini-3-flash-preview',
+        contents: `Act as a high-frequency market intelligence agent. Analyze this crypto news for potential entity correlations and market risks: "${content}". 
+        Return strictly JSON with this schema:
+        {
+          "correlations": [{"entity_name": string, "correlation_type": string, "confidence": string, "related_cryptos": [{"symbol": string, "name": string, "correlation_strength": number}], "risk_level": "LOW"|"MEDIUM"|"HIGH"}],
+          "intelligence": {"total_correlations": number, "high_risk": number, "medium_risk": number, "recommendations": [{"priority": string, "action": string, "description": string, "assigned_to": string}]}
+        }`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              correlations: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    entity_name: { type: Type.STRING },
-                    correlation_type: { type: Type.STRING },
-                    confidence: { type: Type.STRING },
-                    related_cryptos: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          symbol: { type: Type.STRING },
-                          name: { type: Type.STRING },
-                          correlation_strength: { type: Type.NUMBER }
-                        }
-                      }
-                    },
-                    risk_level: { type: Type.STRING }
-                  }
-                }
-              },
-              intelligence: {
-                type: Type.OBJECT,
-                properties: {
-                  total_correlations: { type: Type.NUMBER },
-                  high_risk: { type: Type.NUMBER },
-                  medium_risk: { type: Type.NUMBER },
-                  recommendations: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        priority: { type: Type.STRING },
-                        action: { type: Type.STRING },
-                        description: { type: Type.STRING },
-                        assigned_to: { type: Type.STRING }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+          responseMimeType: "application/json"
         }
       });
 
@@ -197,17 +166,7 @@ const App: React.FC = () => {
       setForecastStatus('active');
     } catch (e: any) {
       setForecastStatus('error');
-      const errStr = e.toString().toLowerCase();
-      
-      if (errStr.includes("requested entity was not found")) {
-        setErrorMessage("Requested entity was not found. Your API project linkage might be invalid. Please re-select your key.");
-      } else if (errStr.includes('429') || errStr.includes('quota')) {
-        setErrorMessage("Quota Exceeded (429): The current API key has hit its limit. Please link a new Google AI Project or provide a fresh key.");
-      } else if (errStr.includes('403') || errStr.includes('leaked')) {
-        setErrorMessage("Access Denied (403): The API key is invalid or restricted. Please verify your billing and referrer settings.");
-      } else {
-        setErrorMessage(e.message || "Intelligence Link Failure: Connection to node timed out.");
-      }
+      setErrorMessage(e.message || "Intelligence Link Failure: Connection timeout.");
     } finally {
       setIsForecasting(false);
     }
@@ -286,9 +245,9 @@ const App: React.FC = () => {
                  <Cpu size={12} /> System Status
               </div>
               <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${errorMessage ? 'bg-rose-500' : (hasGoogleKey || userApiKey ? 'bg-emerald-500' : 'bg-amber-500')}`}></div>
+                 <div className={`w-2 h-2 rounded-full ${errorMessage ? 'bg-rose-500' : (hasGoogleKey || userApiKey ? 'bg-emerald-500' : 'bg-emerald-500/50')}`}></div>
                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                   {errorMessage ? 'Signal Link Alert' : (hasGoogleKey ? 'Google Key Active' : (userApiKey ? 'Custom Key Active' : 'System Default'))}
+                   {errorMessage ? 'Link Alert' : (hasGoogleKey ? 'Cloud Key Active' : (userApiKey ? 'Manual Key Active' : 'Free Tier Active'))}
                  </span>
               </div>
            </div>
@@ -328,9 +287,11 @@ const App: React.FC = () => {
                       <div className="flex flex-wrap gap-3">
                           <button 
                             onClick={handleLinkGoogle}
-                            className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95"
+                            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 ${
+                              hasGoogleKey ? 'bg-emerald-500 text-white' : 'bg-white text-black hover:bg-slate-200'
+                            }`}
                           >
-                             <Chrome size={16} /> Link Google AI Key
+                             <Chrome size={16} /> {hasGoogleKey ? 'Google Account Linked' : 'Link Google Account'}
                           </button>
                       </div>
                   </div>
@@ -339,16 +300,8 @@ const App: React.FC = () => {
                     <div className="mb-10 p-6 bg-rose-500/10 border border-rose-500/20 rounded-[32px] flex items-start gap-5 animate-in fade-in slide-in-from-top-4">
                         <AlertCircle size={32} className="text-rose-400 shrink-0 mt-1" />
                         <div>
-                           <p className="text-md font-black text-rose-100 mb-1 uppercase tracking-tight">Critical Access Alert</p>
-                           <p className="text-sm text-rose-300 leading-relaxed font-medium mb-4">{errorMessage}</p>
-                           <a 
-                             href="https://ai.google.dev/gemini-api/docs/billing" 
-                             target="_blank" 
-                             rel="noopener noreferrer"
-                             className="inline-flex items-center gap-2 text-[10px] font-black uppercase text-rose-400 hover:text-rose-300 underline underline-offset-4"
-                           >
-                             Verify Quotas & Billing <ExternalLink size={12} />
-                           </a>
+                           <p className="text-md font-black text-rose-100 mb-1 uppercase tracking-tight">Signal Link Interrupted</p>
+                           <p className="text-sm text-rose-300 leading-relaxed font-medium">{errorMessage}</p>
                         </div>
                     </div>
                   )}
@@ -376,7 +329,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex flex-col md:flex-row justify-between items-center gap-6 px-4">
                           <p className="text-[11px] text-slate-500 font-bold max-w-lg leading-relaxed">
-                            Bypass system-wide rate limits by providing your own key. Link your Google account above to use your personal cloud projects.
+                            Bypass system-wide rate limits by providing your own key. Link your Google account above to use your personal cloud projects (Free or Paid).
                           </p>
                           <button 
                             onClick={handleSaveKey}
