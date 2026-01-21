@@ -14,13 +14,14 @@ import {
   Globe, 
   Loader2, 
   MapPin,
-  AlertTriangle,
-  Zap,
   RefreshCw,
-  ExternalLink,
   WifiOff,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  Zap,
+  Lock,
+  AlertTriangle
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { DbRecord, RecordType } from '../types';
@@ -38,11 +39,6 @@ const getCountryName = (code: string) => {
 };
 
 // --- TYPES FOR INTELLIGENCE ---
-export interface GroundingSource {
-  title: string;
-  uri: string;
-}
-
 export interface IntelligenceData {
   correlations: Array<{
     entity_name: string;
@@ -62,7 +58,6 @@ export interface IntelligenceData {
       assigned_to: string;
     }>;
   };
-  sources?: GroundingSource[];
 }
 
 export type AIStatus = 'connecting' | 'active' | 'fallback' | 'error';
@@ -144,106 +139,49 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   const [cryptoStable, setCryptoStable] = useState<any[]>([]);
   const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [intelligence, setIntelligence] = useState<IntelligenceData | null>(null);
-  const [aiStatus, setAiStatus] = useState<AIStatus>('connecting');
+  
+  // News Analysis State
+  const [latestForecast, setLatestForecast] = useState<IntelligenceData | null>(null);
+  const [isForecasting, setIsForecasting] = useState(false);
+  const [forecastStatus, setForecastStatus] = useState<AIStatus>('connecting');
+  const [analysisTime, setAnalysisTime] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const sanitizeApiKey = (key: string | undefined): string => {
     if (!key) return '';
     const clean = String(key).trim().replace(/[\n\r\t]/g, '');
     if (clean === 'undefined' || clean === 'null' || !clean) return '';
-    // Strip any non-printable ASCII characters that break Headers.append
     return clean.replace(/[^\x20-\x7E]/g, '');
   };
 
-  const generateHeuristicIntelligence = useCallback((sanctionsData: any[], cryptoData: any[]): IntelligenceData => {
-    const topVolatile = [...cryptoData].sort((a, b) => Math.abs(b.change_24h) - Math.abs(a.change_24h)).slice(0, 2);
-    return {
-      correlations: [
-        {
-          entity_name: "Local Risk Node",
-          correlation_type: "Heuristic Baseline",
-          confidence: "Internal",
-          risk_level: "MEDIUM",
-          related_cryptos: topVolatile.map(c => ({
-            symbol: c.symbol,
-            name: c.name,
-            correlation_strength: 0.85
-          }))
-        }
-      ],
-      intelligence: {
-        total_correlations: 1,
-        high_risk: 0,
-        medium_risk: 1,
-        recommendations: [
-          {
-            priority: "LOW",
-            action: "Monitor Local Feed",
-            description: "Establishing link to agentic reasoning core...",
-            assigned_to: "System Admin"
-          }
-        ]
-      }
-    };
-  }, []);
+  const getEffectiveApiKey = useCallback(() => {
+    return sanitizeApiKey(userApiKey || process.env.API_KEY);
+  }, [userApiKey]);
 
-  const runIntelligenceAnalysis = useCallback(async (sanctionsData: any[], cryptoData: any[]) => {
-    if (sanctionsData.length === 0 || cryptoData.length === 0) return;
-
-    const envKey = (typeof process !== 'undefined' && process.env.API_KEY) ? String(process.env.API_KEY) : '';
-    const cleanUserKey = userApiKey ? String(userApiKey) : '';
-    const rawKey = cleanUserKey || envKey;
-    const effectiveApiKey = sanitizeApiKey(rawKey);
-
-    if (!effectiveApiKey) {
-      setAiStatus('fallback');
-      setIntelligence(generateHeuristicIntelligence(sanctionsData, cryptoData));
+  const analyzeNewsImpact = useCallback(async (content: string) => {
+    const apiKey = getEffectiveApiKey();
+    if (!apiKey) {
+      setForecastStatus('fallback');
+      setErrorMessage("Intelligence Link Inactive: No API key detected.");
       return;
     }
 
-    setIsAnalyzing(true);
-    setAiStatus('connecting');
+    setIsForecasting(true);
+    setForecastStatus('connecting');
+    setErrorMessage(null);
+    const startTime = performance.now();
     
     try {
-      const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
-      
-      const tokenSummary = cryptoData.map(c => `${c.name} (${c.symbol}) price: $${c.price} change: ${c.change_24h}%`).join(', ');
-      const entitySummary = sanctionsData.slice(0, 10).map(s => `${s.name} from ${s.country_code}`).join(', ');
-
-      const prompt = `Act as a senior Crypto Compliance Intelligence Agent.
-      
-      I am providing two datasets from CSV files:
-      1. Global Sanctions: ${entitySummary}
-      2. Market Portfolio: ${tokenSummary}
-      
-      Analyze these for systemic risk and return a detailed intelligence assessment. 
-      Specifically look for current affairs and regulatory trends for the listed tokens (e.g. LINK, SUI, HYPE, BTC, etc.) and how sanctioned entities might interact with their current volatility.
-      
+      const ai = new GoogleGenAI({ apiKey: apiKey });
+      const prompt = `Act as a high-frequency market intelligence agent. Analyze this crypto news for potential entity correlations and market risks: "${content}". 
       Return strictly JSON matching this schema:
       {
-        "correlations": [{
-          "entity_name": string, 
-          "correlation_type": string, 
-          "confidence": "HIGH"|"MEDIUM"|"LOW", 
-          "related_cryptos": [{"symbol": string, "name": string, "correlation_strength": number}], 
-          "risk_level": "LOW"|"MEDIUM"|"HIGH"
-        }],
-        "intelligence": {
-          "total_correlations": number, 
-          "high_risk": number, 
-          "medium_risk": number, 
-          "recommendations": [{
-            "priority": "HIGH"|"MEDIUM"|"LOW", 
-            "action": string, 
-            "description": string, 
-            "assigned_to": string
-          }]
-        }
+        "correlations": [{"entity_name": string, "correlation_type": string, "confidence": "HIGH"|"MEDIUM"|"LOW", "related_cryptos": [{"symbol": string, "name": string, "correlation_strength": number}], "risk_level": "LOW"|"MEDIUM"|"HIGH"}],
+        "intelligence": {"total_correlations": number, "high_risk": number, "medium_risk": number, "recommendations": [{"priority": "HIGH"|"MEDIUM"|"LOW", "action": string, "description": string, "assigned_to": string}]}
       }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -302,21 +240,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       });
 
       const responseText = response.text;
-      if (!responseText) throw new Error("Empty AI Response");
+      if (!responseText) throw new Error("Empty AI Response Signal");
 
-      const result: IntelligenceData = JSON.parse(responseText);
-      setIntelligence(result);
-      setAiStatus('active');
-    } catch (err: any) {
-      console.error("Agent Inference Failure:", err);
-      setAiStatus('error');
-      if (!intelligence) {
-        setIntelligence(generateHeuristicIntelligence(sanctionsData, cryptoData));
-      }
+      const forecast: IntelligenceData = JSON.parse(responseText);
+      const endTime = performance.now();
+      setAnalysisTime(Math.round(endTime - startTime));
+      setLatestForecast(forecast);
+      setForecastStatus('active');
+    } catch (e: any) {
+      setForecastStatus('error');
+      setErrorMessage(e.message || "Intelligence Link Failure: Connection timeout.");
     } finally {
-      setIsAnalyzing(false);
+      setIsForecasting(false);
     }
-  }, [userApiKey, generateHeuristicIntelligence, intelligence]);
+  }, [getEffectiveApiKey]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -327,7 +264,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
           fetch('data/crypto_stable.json').catch(() => fetch('./data/crypto_stable.json')),
           fetch('data/crypto_alt.json').catch(() => fetch('./data/crypto_alt.json'))
         ]);
-        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) throw new Error('Source Link Error');
+        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) throw new Error('Data Sync Failure');
         const [sanctionsData, stableData, altData] = await Promise.all([
           sanctionsRes.json(), stableRes.json(), altRes.json()
         ]);
@@ -335,7 +272,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         setCryptoStable(stableData);
         setCryptoAlt(altData);
       } catch (err) {
-        console.warn("Fetch failure:", err);
+        console.warn("Dashboard sync error:", err);
       } finally {
         setIsLoading(false);
       }
@@ -343,11 +280,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     fetchData();
   }, []);
 
+  // Trigger analysis when latest news changes
   useEffect(() => {
-    if (!isLoading && sanctions.length > 0 && (cryptoStable.length > 0 || cryptoAlt.length > 0)) {
-      runIntelligenceAnalysis(sanctions, [...cryptoStable, ...cryptoAlt]);
+    const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
+    if (latestNews) {
+      analyzeNewsImpact(latestNews.content);
     }
-  }, [userApiKey, sanctions, cryptoStable, cryptoAlt, isLoading]);
+  }, [userRecords, analyzeNewsImpact, userApiKey]);
 
   const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
   const highVolatilityCount = useMemo(() => allCrypto.filter(c => Math.abs(c.change_24h) > 5).length, [allCrypto]);
@@ -365,18 +304,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
 
   return (
     <div className="max-w-[1800px] mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
+      {/* Dashboard Header */}
       <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden group">
          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-indigo-500"></div>
          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-emerald-200 mb-2 tracking-tight text-white group-hover:scale-[1.01] transition-transform duration-700">
            DWA Market Intelligence
          </h1>
-         <p className="text-slate-400 font-medium opacity-80 uppercase tracking-widest text-[10px] font-black">AI Risk Synthesis | CSV & Real-time Integration</p>
+         <p className="text-slate-400 font-medium opacity-80 uppercase tracking-widest text-[10px] font-black">Agentic Risk Node | Real-time CSV & News Integration</p>
       </div>
 
+      {/* Tier 1 monitoring stats */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 1 • Monitoring</span>
+            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 1 • Global Monitoring</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
         </div>
 
@@ -406,7 +347,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                         <h3 className="text-xl font-black uppercase tracking-tight">{getCountryName(topCountry.code)}</h3>
                         <p className="text-[10px] text-rose-400 font-black uppercase mt-2 tracking-widest">{topCountry.count} Entities Logged</p>
                       </div>
-                    ) : <div className="text-slate-500 font-black uppercase text-xs">Waiting for Data Sync...</div>}
+                    ) : <div className="text-slate-500 font-black uppercase text-xs">Waiting for Node Sync...</div>}
                   </div>
                 </div>
              </div>
@@ -439,7 +380,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                            {Math.abs(mostVolatileAsset.change_24h).toFixed(2)}% Intensity
                         </div>
                       </div>
-                    ) : <div className="text-slate-500 font-black uppercase text-xs">Scanning CSV Node...</div>}
+                    ) : <div className="text-slate-500 font-black uppercase text-xs">Scanning Market Node...</div>}
                   </div>
                 </div>
              </div>
@@ -447,15 +388,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         </div>
       </section>
 
+      {/* Tier 2 registry lists */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 2 • Analysis</span>
+            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 2 • Deep Analysis</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/5 rounded-[40px] p-8 h-[600px] flex flex-col shadow-2xl overflow-hidden">
+          <div className="bg-black/40 backdrop-blur-xl border border-white/5 rounded-[40px] p-8 h-[600px] flex flex-col shadow-2xl">
              <h3 className="font-black text-sm text-white flex items-center gap-2 uppercase tracking-widest mb-6 text-rose-400">
                 <ShieldAlert size={16} />
                 Sanctions Registry
@@ -489,6 +431,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         </div>
       </section>
 
+      {/* Tier 3 • Intelligence Agent (Relocated Live Impact Analysis) */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
@@ -496,121 +439,155 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
         </div>
 
-        <div className={`bg-white/5 backdrop-blur-3xl border rounded-[40px] p-10 shadow-2xl relative overflow-hidden transition-all duration-700 ${
-            aiStatus === 'active' ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-white/10'
-        }`}>
-            <div className={`absolute -bottom-32 -right-32 w-96 h-96 rounded-full blur-[140px] opacity-[0.08] transition-colors duration-1000 ${
-                aiStatus === 'active' ? 'bg-emerald-500' : 'bg-blue-500'
-            }`}></div>
+        <div className="bg-gradient-to-br from-blue-900/40 to-indigo-900/40 backdrop-blur-3xl border border-blue-500/20 rounded-[40px] p-10 shadow-2xl relative overflow-hidden transition-all duration-700">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 relative z-10">
+              <div className="flex items-center gap-4">
+                  {forecastStatus === 'active' ? (
+                    <div className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+                       <ShieldCheck size={20} className="text-emerald-400" />
+                       <span className="text-[11px] font-black text-emerald-200 uppercase tracking-[0.2em]">Agent Verified</span>
+                    </div>
+                  ) : forecastStatus === 'fallback' ? (
+                    <div className="flex items-center gap-2 px-6 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-full">
+                       <WifiOff size={20} className="text-amber-400" />
+                       <span className="text-[11px] font-black text-amber-200 uppercase tracking-[0.2em]">Heuristic Mode</span>
+                    </div>
+                  ) : forecastStatus === 'connecting' ? (
+                    <div className="flex items-center gap-2 px-6 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-full">
+                       <Loader2 size={20} className="text-blue-400 animate-spin" />
+                       <span className="text-[11px] font-black text-blue-200 uppercase tracking-[0.2em]">Synthesizing...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-6 py-2.5 bg-rose-500/10 border border-rose-500/30 rounded-full">
+                       <AlertTriangle size={20} className="text-rose-400" />
+                       <span className="text-[11px] font-black text-rose-200 uppercase tracking-[0.2em]">Agent Offline</span>
+                    </div>
+                  )}
+              </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-6 mb-12 relative z-10">
-                <div className="flex items-center gap-4">
-                    {aiStatus === 'active' ? (
-                      <div className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.1)]">
-                         <ShieldCheck size={20} className="text-emerald-400" />
-                         <span className="text-[11px] font-black text-emerald-200 uppercase tracking-[0.2em]">Agent Verified</span>
-                      </div>
-                    ) : aiStatus === 'fallback' ? (
-                      <div className="flex items-center gap-2 px-6 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-full">
-                         <WifiOff size={20} className="text-amber-400" />
-                         <span className="text-[11px] font-black text-amber-200 uppercase tracking-[0.2em]">Heuristic Fallback</span>
-                      </div>
-                    ) : aiStatus === 'connecting' ? (
-                      <div className="flex items-center gap-2 px-6 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-full">
-                         <Loader2 size={20} className="text-blue-400 animate-spin" />
-                         <span className="text-[11px] font-black text-blue-200 uppercase tracking-[0.2em]">Connecting Agent...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 px-6 py-2.5 bg-rose-500/10 border border-rose-500/30 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.1)]">
-                         <AlertCircle size={20} className="text-rose-400" />
-                         <span className="text-[11px] font-black text-rose-200 uppercase tracking-[0.2em]">Agent Offline</span>
-                      </div>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
+                  {analysisTime && !isForecasting && !errorMessage && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full">
+                        <Clock size={12} className="text-slate-300" />
+                        <span className="text-[10px] font-mono font-black text-slate-200 uppercase">{analysisTime}ms</span>
+                    </div>
+                  )}
                   <button 
-                    onClick={() => runIntelligenceAnalysis(sanctions, allCrypto)}
+                    onClick={() => {
+                      const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
+                      if (latestNews) analyzeNewsImpact(latestNews.content);
+                    }}
                     className="p-3 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all hover:scale-110 active:rotate-180 duration-500 shadow-xl"
                     title="Force Global Risk Sync"
                   >
-                    <RefreshCw size={18} className={isAnalyzing ? 'animate-spin' : ''} />
+                    <RefreshCw size={18} className={isForecasting ? 'animate-spin' : ''} />
                   </button>
+              </div>
+          </div>
+
+          {!latestForecast && !isForecasting && !errorMessage && (
+            <div className="h-64 flex flex-col items-center justify-center text-slate-500 border border-dashed border-white/10 rounded-[32px] bg-black/20">
+                <BrainCircuit size={48} className="opacity-20 mb-4" />
+                <p className="font-black uppercase text-[10px] tracking-[0.3em]">Awaiting News Feed to Trigger Neural Analysis</p>
+            </div>
+          )}
+
+          {isForecasting && (
+            <div className="h-64 flex items-center justify-center bg-black/40 rounded-[32px] border border-white/5">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                    <span className="text-[11px] font-black text-blue-300 uppercase tracking-[0.3em] animate-pulse">Establishing Link to Agentic Core...</span>
                 </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 relative z-10">
-                <div className="space-y-6">
-                   <h3 className="text-xl font-black text-white flex items-center gap-3 uppercase tracking-tight mb-8">
-                      <LinkIcon size={22} className="text-emerald-400" /> Forensic Correlations
-                   </h3>
-                   
-                   {(intelligence?.correlations || []).map((corr, i) => (
-                     <div key={i} className="bg-black/60 rounded-[32px] p-8 border border-white/5 border-l-8 border-l-emerald-500 shadow-2xl group hover:bg-black/70 transition-all hover:-translate-y-1">
-                        <div className="flex justify-between items-start mb-8">
-                           <div>
-                              <h4 className="font-black text-white text-xl tracking-tight mb-1">{corr.entity_name}</h4>
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{corr.correlation_type}</p>
-                           </div>
-                           <span className={`px-4 py-1.5 text-[10px] font-black rounded-full border uppercase tracking-widest ${
-                             corr.risk_level === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 
-                             'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                           }`}>{corr.risk_level} IMPACT</span>
-                        </div>
-                        <div className="space-y-3">
-                              {corr.related_cryptos.map((rc, j) => (
-                                <div key={j} className="bg-white/5 rounded-2xl p-5 flex justify-between items-center text-white border border-white/5 group-hover:bg-white/10 transition-colors">
-                                   <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center font-black text-xs text-emerald-400 border border-emerald-500/20">
-                                         {rc.symbol[0]}
-                                      </div>
-                                      <span className="text-sm font-black">{rc.name}</span>
-                                   </div>
-                                   <div className="flex items-center gap-4">
-                                       <div className="w-24 h-1.5 bg-black/40 rounded-full overflow-hidden">
-                                           <div className="h-full bg-emerald-500" style={{ width: `${rc.correlation_strength * 100}%` }}></div>
-                                       </div>
-                                       <span className="text-[11px] font-mono font-black text-emerald-400">{(rc.correlation_strength * 100).toFixed(0)}%</span>
-                                   </div>
-                                </div>
-                              ))}
-                        </div>
-                     </div>
-                   ))}
-                </div>
+          {errorMessage && (
+            <div className="h-64 flex flex-col items-center justify-center text-rose-500/50 border border-dashed border-rose-500/20 rounded-[32px] bg-rose-500/5 p-8 text-center">
+                <AlertCircle size={48} className="opacity-40 mb-4" />
+                <p className="font-black uppercase text-[10px] tracking-[0.2em] mb-2">Neural Node Connection Interrupted</p>
+                <p className="text-xs text-rose-300/60 font-medium max-w-sm mb-6">{errorMessage}</p>
+                <button onClick={() => {
+                   const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
+                   if (latestNews) analyzeNewsImpact(latestNews.content);
+                }} className="text-[10px] font-black uppercase tracking-widest text-white px-6 py-2.5 bg-rose-500 rounded-full hover:bg-rose-600 transition-colors">Retry Sync</button>
+            </div>
+          )}
 
+          {latestForecast && !isForecasting && !errorMessage && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in slide-in-from-bottom-8 relative z-10">
                 <div className="space-y-6">
-                   <h3 className="text-xl font-black text-white flex items-center gap-3 uppercase tracking-tight mb-8">
-                      <Lightbulb size={22} className="text-amber-400" /> Strategic Directives
-                   </h3>
-                   <div className="grid grid-cols-1 gap-6">
-                    {(intelligence?.intelligence.recommendations || []).map((rec, i) => (
-                      <div key={i} className="bg-black/40 rounded-[32px] p-8 border border-white/5 hover:border-amber-500/30 transition-all shadow-2xl relative group overflow-hidden">
-                          <div className={`absolute top-0 right-0 w-1 h-full transition-colors ${
-                             rec.priority === 'HIGH' ? 'bg-rose-500' : 'bg-amber-500/50'
-                          }`}></div>
-                          
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-black text-slate-100 uppercase text-xs tracking-[0.2em]">{rec.action}</h4>
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
-                                rec.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-white/5 text-slate-400 border-white/10'
-                            }`}>{rec.priority} PRIORITY</span>
-                          </div>
-                          
-                          <p className="text-slate-400 text-sm leading-relaxed font-medium mb-6">{rec.description}</p>
-                          
-                          <div className="pt-6 border-t border-white/5 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <MapPin size={12} className="text-slate-600" />
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assignee: {rec.assigned_to}</span>
+                    <h3 className="text-xl font-black text-white flex items-center gap-3 uppercase tracking-tight mb-8">
+                       <LinkIcon size={22} className="text-emerald-400" /> High-Confidence Correlations
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      {latestForecast.correlations.map((corr, i) => (
+                          <div key={i} className="bg-black/60 rounded-[32px] p-8 border border-white/5 border-l-8 border-l-emerald-500 shadow-2xl group hover:bg-black/70 transition-all hover:-translate-y-1">
+                              <div className="flex justify-between items-start mb-6">
+                                  <div>
+                                      <h4 className="font-black text-white text-xl tracking-tight mb-1">{corr.entity_name}</h4>
+                                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{corr.correlation_type}</p>
+                                  </div>
+                                  <span className={`px-4 py-1.5 text-[10px] font-black rounded-full border uppercase tracking-widest ${
+                                    corr.risk_level === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 
+                                    'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                  }`}>{corr.risk_level} IMPACT</span>
                               </div>
-                              <ArrowRight size={16} className="text-slate-700 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+                              <div className="space-y-3">
+                                    {corr.related_cryptos.map((rc, j) => (
+                                      <div key={j} className="bg-white/5 rounded-2xl p-5 flex justify-between items-center text-white border border-white/5">
+                                         <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center font-black text-xs text-emerald-400 border border-emerald-500/20">
+                                               {rc.symbol[0]}
+                                            </div>
+                                            <span className="text-sm font-black">{rc.name}</span>
+                                         </div>
+                                         <div className="flex items-center gap-4">
+                                             <div className="w-24 h-1.5 bg-black/40 rounded-full overflow-hidden">
+                                                 <div className="h-full bg-emerald-400" style={{ width: `${rc.correlation_strength * 100}%` }}></div>
+                                             </div>
+                                             <span className="text-[11px] font-mono font-black text-emerald-400">{(rc.correlation_strength * 100).toFixed(0)}%</span>
+                                         </div>
+                                      </div>
+                                    ))}
+                              </div>
                           </div>
-                      </div>
-                    ))}
-                   </div>
+                      ))}
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <h3 className="text-xl font-black text-white flex items-center gap-3 uppercase tracking-tight mb-8">
+                       <Lightbulb size={22} className="text-amber-400" /> Strategic Directives
+                    </h3>
+                    <div className="grid grid-cols-1 gap-6">
+                      {latestForecast.intelligence.recommendations.map((rec, i) => (
+                          <div key={i} className="bg-black/40 rounded-[32px] p-8 border border-white/5 hover:border-amber-500/30 transition-all shadow-2xl relative group overflow-hidden">
+                              <div className={`absolute top-0 right-0 w-1 h-full transition-colors ${
+                                 rec.priority === 'HIGH' ? 'bg-rose-500' : 'bg-amber-500/50'
+                              }`}></div>
+                              
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-black text-slate-100 uppercase text-xs tracking-[0.2em]">{rec.action}</h4>
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                                    rec.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-white/5 text-slate-400 border-white/10'
+                                }`}>{rec.priority} PRIORITY</span>
+                              </div>
+                              
+                              <p className="text-slate-400 text-sm leading-relaxed font-medium mb-6">{rec.description}</p>
+                              
+                              <div className="pt-6 border-t border-white/5 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <MapPin size={12} className="text-slate-600" />
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Assignee: {rec.assigned_to}</span>
+                                  </div>
+                                  <ArrowRight size={16} className="text-slate-700 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+                              </div>
+                          </div>
+                      ))}
+                    </div>
                 </div>
             </div>
+          )}
         </div>
       </section>
     </div>

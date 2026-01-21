@@ -5,21 +5,14 @@ import { ConnectionStatus, DbRecord, RecordType, SystemStats } from './types';
 import { DbStatus } from './components/DbStatus';
 import { ActionWidget } from './components/ActionWidget';
 import { Feed } from './components/Feed';
-import { Dashboard, IntelligenceData, AIStatus } from './components/Dashboard';
+import { Dashboard } from './components/Dashboard';
 import { 
   LayoutDashboard, 
   History, 
   Menu, 
   X, 
   Home, 
-  BrainCircuit, 
-  Zap, 
   RefreshCw, 
-  WifiOff, 
-  AlertTriangle,
-  Clock,
-  TrendingUp,
-  ArrowRight,
   Cpu,
   Lock,
   Key,
@@ -27,10 +20,8 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
-  Chrome,
-  ExternalLink
+  Chrome
 } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
 
 declare global {
   interface AIStudio {
@@ -54,22 +45,9 @@ const App: React.FC = () => {
   const [showKey, setShowKey] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
   const [hasGoogleKey, setHasGoogleKey] = useState(false);
-
-  const [latestForecast, setLatestForecast] = useState<IntelligenceData | null>(null);
-  const [isForecasting, setIsForecasting] = useState(false);
-  const [forecastStatus, setForecastStatus] = useState<AIStatus>('connecting');
-  const [analysisTime, setAnalysisTime] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
-
-  const sanitizeApiKey = (key: string | undefined): string => {
-    if (!key) return '';
-    const clean = String(key).trim().replace(/[\n\r\t]/g, '');
-    if (clean === 'undefined' || clean === 'null' || !clean) return '';
-    // Strip any non-printable ASCII characters that break Headers.append
-    return clean.replace(/[^\x20-\x7E]/g, '');
-  };
 
   useEffect(() => {
     const checkKey = async () => {
@@ -91,7 +69,6 @@ const App: React.FC = () => {
         await window.aistudio.openSelectKey();
         setHasGoogleKey(true);
         setErrorMessage(null);
-        refreshIntelligence();
       } catch (err) {
         console.error("Failed to open key selector", err);
       }
@@ -103,18 +80,6 @@ const App: React.FC = () => {
     setKeySaved(true);
     setErrorMessage(null);
     setTimeout(() => setKeySaved(false), 3000);
-    refreshIntelligence();
-  };
-
-  const refreshIntelligence = () => {
-    const lastNews = records.find(r => r.type === RecordType.NEWS);
-    if (lastNews) {
-      analyzeNewsImpact(lastNews.content);
-    }
-  };
-
-  const getEffectiveApiKey = () => {
-    return sanitizeApiKey(userApiKey || process.env.API_KEY);
   };
 
   const refreshData = useCallback(async () => {
@@ -128,57 +93,10 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const analyzeNewsImpact = async (content: string) => {
-    const apiKey = getEffectiveApiKey();
-    if (!apiKey) {
-      setForecastStatus('fallback');
-      setErrorMessage("Intelligence Link Inactive: No API key detected.");
-      return;
-    }
-
-    setIsForecasting(true);
-    setForecastStatus('connecting');
-    setErrorMessage(null);
-    const startTime = performance.now();
-    
-    try {
-      const ai = new GoogleGenAI({ apiKey: apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Act as a high-frequency market intelligence agent. Analyze this crypto news for potential entity correlations and market risks: "${content}". 
-        Return strictly JSON with this schema:
-        {
-          "correlations": [{"entity_name": string, "correlation_type": string, "confidence": string, "related_cryptos": [{"symbol": string, "name": string, "correlation_strength": number}], "risk_level": "LOW"|"MEDIUM"|"HIGH"}],
-          "intelligence": {"total_correlations": number, "high_risk": number, "medium_risk": number, "recommendations": [{"priority": string, "action": string, "description": string, "assigned_to": string}]}
-        }`,
-        config: {
-          responseMimeType: "application/json"
-        }
-      });
-
-      const responseText = response.text;
-      if (!responseText) throw new Error("Empty AI Response");
-
-      const forecast: IntelligenceData = JSON.parse(responseText);
-      const endTime = performance.now();
-      setAnalysisTime(Math.round(endTime - startTime));
-      setLatestForecast(forecast);
-      setForecastStatus('active');
-    } catch (e: any) {
-      setForecastStatus('error');
-      setErrorMessage(e.message || "Intelligence Link Failure: Connection timeout.");
-    } finally {
-      setIsForecasting(false);
-    }
-  };
-
   const handleAddRecord = async (type: RecordType, content: string) => {
     try {
       await dbService.addRecord(type, content);
       await refreshData();
-      if (type === RecordType.NEWS) {
-        analyzeNewsImpact(content);
-      }
     } catch (err) {
       console.error(err);
     }
@@ -358,96 +276,6 @@ const App: React.FC = () => {
                   description="Log restricted international entities for risk correlation."
                   onSubmit={(content) => handleAddRecord(RecordType.SANCTION, content)}
                 />
-              </div>
-
-              <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 backdrop-blur-3xl border border-blue-500/20 rounded-[40px] p-8 shadow-2xl relative overflow-hidden">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 relative z-10">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <Zap size={24} className="text-amber-400" />
-                            <h3 className="text-2xl font-black text-white uppercase tracking-tight text-white">Live Impact Analysis</h3>
-                        </div>
-                        <p className="text-blue-200/50 font-bold text-[10px] uppercase tracking-[0.2em]">Automated Intelligence Projections</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                          {analysisTime && !isForecasting && !errorMessage && (
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full">
-                                <Clock size={12} className="text-slate-500" />
-                                <span className="text-[10px] font-mono font-black text-slate-300 uppercase">{analysisTime}ms</span>
-                            </div>
-                          )}
-                          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${
-                            errorMessage ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
-                            (forecastStatus === 'active' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-500/10 border-slate-500/30 text-slate-400')
-                          }`}>
-                            {isForecasting ? <RefreshCw size={14} className="animate-spin" /> : (errorMessage ? <AlertTriangle size={14} /> : <Lock size={14} />)}
-                            {isForecasting ? 'Mapping...' : (errorMessage ? 'Link Error' : 'Ready')}
-                          </div>
-                      </div>
-                  </div>
-
-                  {!latestForecast && !isForecasting && !errorMessage && (
-                    <div className="h-48 flex flex-col items-center justify-center text-slate-600 border border-dashed border-white/10 rounded-[32px] bg-black/20">
-                        <BrainCircuit size={40} className="opacity-10 mb-4" />
-                        <p className="font-black uppercase text-[10px] tracking-[0.3em]">Publish News to Trigger Neural Analysis</p>
-                    </div>
-                  )}
-
-                  {isForecasting && (
-                    <div className="h-48 flex items-center justify-center bg-black/40 rounded-[32px] border border-white/5">
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-                            <span className="text-[10px] font-black text-blue-300 uppercase tracking-[0.3em] animate-pulse">Running Agentic Reasoning</span>
-                        </div>
-                    </div>
-                  )}
-
-                  {errorMessage && (
-                    <div className="h-48 flex flex-col items-center justify-center text-rose-500/50 border border-dashed border-rose-500/20 rounded-[32px] bg-rose-500/5">
-                        <WifiOff size={40} className="opacity-20 mb-4" />
-                        <p className="font-black uppercase text-[10px] tracking-[0.3em]">Intelligence Node Offline</p>
-                        <button onClick={() => refreshIntelligence()} className="mt-4 text-[9px] font-black uppercase tracking-widest text-white underline underline-offset-4">Retry Signal</button>
-                    </div>
-                  )}
-
-                  {latestForecast && !isForecasting && !errorMessage && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-6 relative z-10">
-                        <div className="space-y-4">
-                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
-                               <TrendingUp size={14} /> Neural Correlations
-                            </h4>
-                            <div className="grid grid-cols-1 gap-3">
-                              {latestForecast.correlations.map((corr, i) => (
-                                  <div key={i} className="bg-white/5 border border-white/10 p-5 rounded-2xl flex justify-between items-center hover:bg-white/10 transition-all">
-                                      <div>
-                                          <p className="text-sm font-black text-white">{corr.entity_name}</p>
-                                          <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">{corr.correlation_type}</p>
-                                      </div>
-                                      <div className={`px-3 py-1 text-[10px] font-black rounded-full border ${corr.risk_level === 'HIGH' ? 'text-rose-400 border-rose-500/20' : 'text-emerald-400 border-emerald-500/20'}`}>
-                                          {corr.risk_level} IMPACT
-                                      </div>
-                                  </div>
-                              ))}
-                            </div>
-                        </div>
-                        <div className="space-y-4">
-                            <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
-                               <BrainCircuit size={14} /> Agent Directives
-                            </h4>
-                            <div className="grid grid-cols-1 gap-3">
-                              {latestForecast.intelligence.recommendations.map((rec, i) => (
-                                  <div key={i} className="bg-black/40 border border-white/5 p-5 rounded-2xl border-l-4 border-l-amber-500">
-                                      <div className="flex items-center justify-between mb-2">
-                                          <h5 className="text-xs font-black text-slate-100 uppercase">{rec.action}</h5>
-                                          <span className="text-[9px] font-black text-amber-500/60 uppercase">{rec.priority}</span>
-                                      </div>
-                                      <p className="text-[11px] text-slate-400 leading-relaxed font-medium">{rec.description}</p>
-                                  </div>
-                              ))}
-                            </div>
-                        </div>
-                    </div>
-                  )}
               </div>
             </div>
           )}
