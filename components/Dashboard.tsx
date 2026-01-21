@@ -183,12 +183,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   const runIntelligenceAnalysis = useCallback(async (sanctionsData: any[], cryptoData: any[]) => {
     if (sanctionsData.length === 0 || cryptoData.length === 0) return;
 
-    // Detect valid API Key
-    const envKey = (typeof process !== 'undefined' && process.env.API_KEY) ? String(process.env.API_KEY).trim() : '';
-    const cleanUserKey = userApiKey ? String(userApiKey).trim() : '';
-    const effectiveApiKey = (cleanUserKey && cleanUserKey !== 'undefined') ? cleanUserKey : (envKey && envKey !== 'undefined' ? envKey : '');
+    // Aggressive API key sanitization to avoid header encoding issues
+    const sanitizeKey = (key: any) => {
+      if (!key) return '';
+      const str = String(key).trim().replace(/[\n\r\t]/g, '');
+      return (str === 'undefined' || str === 'null') ? '' : str;
+    };
 
-    if (!effectiveApiKey || effectiveApiKey === '') {
+    const envKey = sanitizeKey(process.env.API_KEY);
+    const manualKey = sanitizeKey(userApiKey);
+    const effectiveApiKey = manualKey || envKey;
+
+    if (!effectiveApiKey) {
       setAiStatus('fallback');
       setIntelligence(generateHeuristicIntelligence(sanctionsData, cryptoData));
       return;
@@ -201,59 +207,90 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
       
       const tokenSummary = cryptoData.map(c => `${c.name} (${c.symbol}) Price: $${c.price}, 24h: ${c.change_24h}%`).join('; ');
-      const entitySummary = sanctionsData.slice(0, 10).map(s => `${s.name} (${s.country_code})`).join('; ');
+      const entitySummary = sanctionsData.slice(0, 8).map(s => `${s.name} (${s.country_code})`).join('; ');
 
-      const prompt = `Act as a senior Crypto Forensic AI. Cross-correlate these global datasets for systemic risk:
+      const prompt = `Act as a senior Crypto Forensic AI. Cross-correlate these global datasets for systemic risk and return a detailed intelligence assessment based on current affairs for these specific tokens.
       
-      GLOBAL SANCTIONS: ${entitySummary}
-      MARKET PORTFOLIO: ${tokenSummary}
+      GLOBAL SANCTIONS (from registry): ${entitySummary}
+      MARKET PORTFOLIO (from CSV): ${tokenSummary}
       
       Analyze:
-      1. Institutional flow anomalies for major coins (BTC, ETH, SOL).
-      2. Regulatory risks affecting Stablecoins (USDT, USDC).
-      3. Project-specific current affairs for alt-tokens (LINK, SUI, HYPE, etc.).
-      4. Risk of sanctioned entities obfuscating cross-border transfers via the high-volatility tokens provided.
+      1. Institutional flow anomalies for major coins like Bitcoin, Ethereum, Solana.
+      2. Regulatory pressure on Stablecoins (USDT, USDC).
+      3. Project-specific current affairs for alt-tokens (LINK, SUI, HYPE, NEAR, etc.) in relation to global entities.
+      4. Risk of money laundering or obfuscation via high-volatility tokens.
       
-      OUTPUT FORMAT: JSON ONLY.
-      {
-        "correlations": [{
-          "entity_name": string,
-          "correlation_type": "Flow Anomaly" | "Network Proximity" | "Regulatory Risk",
-          "confidence": "HIGH" | "MEDIUM" | "LOW",
-          "related_cryptos": [{"symbol": string, "name": string, "correlation_strength": number}],
-          "risk_level": "LOW" | "MEDIUM" | "HIGH"
-        }],
-        "intelligence": {
-          "total_correlations": number,
-          "high_risk": number,
-          "medium_risk": number,
-          "recommendations": [{
-            "priority": "HIGH" | "MEDIUM" | "LOW",
-            "action": string,
-            "description": string,
-            "assigned_to": string
-          }]
-        }
-      }`;
+      You MUST return the output strictly in JSON format matching the schema exactly.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              correlations: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    entity_name: { type: Type.STRING },
+                    correlation_type: { type: Type.STRING },
+                    confidence: { type: Type.STRING },
+                    related_cryptos: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          symbol: { type: Type.STRING },
+                          name: { type: Type.STRING },
+                          correlation_strength: { type: Type.NUMBER }
+                        }
+                      }
+                    },
+                    risk_level: { type: Type.STRING }
+                  },
+                  required: ["entity_name", "correlation_type", "confidence", "related_cryptos", "risk_level"]
+                }
+              },
+              intelligence: {
+                type: Type.OBJECT,
+                properties: {
+                  total_correlations: { type: Type.NUMBER },
+                  high_risk: { type: Type.NUMBER },
+                  medium_risk: { type: Type.NUMBER },
+                  recommendations: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        priority: { type: Type.STRING },
+                        action: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        assigned_to: { type: Type.STRING }
+                      }
+                    }
+                  }
+                },
+                required: ["total_correlations", "high_risk", "medium_risk", "recommendations"]
+              }
+            },
+            required: ["correlations", "intelligence"]
+          }
         }
       });
 
       const responseText = response.text;
-      if (!responseText) throw new Error("Empty AI response");
+      if (!responseText) throw new Error("Empty AI signal");
 
       const result: IntelligenceData = JSON.parse(responseText);
       setIntelligence(result);
       setAiStatus('active');
     } catch (err: any) {
-      console.error("Tier 3 Agent Error:", err);
+      console.error("Tier 3 Agent Intelligence Error:", err);
       setAiStatus('error');
-      // If error occurs, keep heuristic data but show error status
+      // On failure, we show heuristic fallback so UI isn't broken
       if (!intelligence) {
         setIntelligence(generateHeuristicIntelligence(sanctionsData, cryptoData));
       }
@@ -262,7 +299,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     }
   }, [userApiKey, generateHeuristicIntelligence, intelligence]);
 
-  // Data Loading Effect
+  // Data Loading
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -272,7 +309,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
           fetch('data/crypto_stable.json').catch(() => fetch('./data/crypto_stable.json')),
           fetch('data/crypto_alt.json').catch(() => fetch('./data/crypto_alt.json'))
         ]);
-        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) throw new Error('Data Load Error');
+        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) throw new Error('CSV Link Failure');
         const [sanctionsData, stableData, altData] = await Promise.all([
           sanctionsRes.json(), stableRes.json(), altRes.json()
         ]);
@@ -280,7 +317,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         setCryptoStable(stableData);
         setCryptoAlt(altData);
       } catch (err) {
-        console.warn("Fetch failure:", err);
+        console.warn("Dashboard sync error:", err);
       } finally {
         setIsLoading(false);
       }
@@ -288,7 +325,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     fetchData();
   }, []);
 
-  // Analysis Trigger Effect
+  // Sync analysis when data or key changes
   useEffect(() => {
     if (!isLoading && sanctions.length > 0 && (cryptoStable.length > 0 || cryptoAlt.length > 0)) {
       runIntelligenceAnalysis(sanctions, [...cryptoStable, ...cryptoAlt]);
