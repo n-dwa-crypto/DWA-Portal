@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { 
   TrendingUp, 
@@ -150,45 +149,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Caching mechanism to prevent redundant API calls on focus/re-render
-  const lastAnalyzedRef = useRef<{ id: string | null; content: string | null }>({ id: null, content: null });
+  const lastAnalyzedRef = useRef<{ id: string | null; content: string | null; apiKey: string | null }>({ id: null, content: null, apiKey: null });
 
   const sanitizeApiKey = (key: string | undefined): string => {
     if (!key) return '';
-    const clean = String(key).trim().replace(/[\n\r\t]/g, '');
+    const clean = String(key).trim();
     if (clean === 'undefined' || clean === 'null' || !clean) return '';
     return clean.replace(/[^\x20-\x7E]/g, '');
   };
 
   const getEffectiveApiKey = useCallback(() => {
-    // Priority 1: User-entered Manual Key
-    if (userApiKey) return sanitizeApiKey(userApiKey);
+    // Priority: Prop value (synced in App root from URL/Local/Manual)
+    if (userApiKey && userApiKey.trim() !== '') return sanitizeApiKey(userApiKey);
     
-    // Priority 2: URL parameter Key
-    const params = new URLSearchParams(window.location.search);
-    const urlKey = params.get('key');
-    if (urlKey) return sanitizeApiKey(urlKey);
-    
-    // Priority 3: System default (process.env)
+    // Fallback: System default
     return sanitizeApiKey(process.env.API_KEY);
   }, [userApiKey]);
 
   const analyzeNewsImpact = useCallback(async (content: string, recordId: string, force = false) => {
-    // 1. Memory Check: If this specific record has already been analyzed in THIS instance, skip.
-    if (!force && lastAnalyzedRef.current.id === recordId && lastAnalyzedRef.current.content === content) {
-      console.debug("Intelligence memory cache hit:", recordId);
+    const apiKey = getEffectiveApiKey();
+
+    // Prevent redundant calls if content, ID, and API Key are unchanged
+    if (!force && 
+        lastAnalyzedRef.current.id === recordId && 
+        lastAnalyzedRef.current.content === content && 
+        lastAnalyzedRef.current.apiKey === apiKey) {
       return;
     }
 
-    // 2. Persistent Storage Check: Check if we have a saved response for this ID.
     if (!force) {
       try {
         const cacheRaw = localStorage.getItem(INTEL_CACHE_KEY);
         const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
         if (cache[recordId]) {
-          console.debug("Intelligence persistent cache hit:", recordId);
           setLatestForecast(cache[recordId]);
           setForecastStatus('active');
-          lastAnalyzedRef.current = { id: recordId, content };
+          lastAnalyzedRef.current = { id: recordId, content, apiKey };
           return;
         }
       } catch (e) {
@@ -196,10 +192,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       }
     }
 
-    const apiKey = getEffectiveApiKey();
     if (!apiKey) {
       setForecastStatus('fallback');
-      setErrorMessage("Intelligence Node Offline: No API credentials found.");
+      setErrorMessage("Intelligence Node Offline: No API credentials found in URL or configuration.");
       return;
     }
 
@@ -209,7 +204,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     const startTime = performance.now();
     
     try {
+      // Reverted to default endpoint
       const ai = new GoogleGenAI({ apiKey: apiKey });
+      
       const prompt = `Act as a senior market risk intelligence agent. High-intensity analysis required for this crypto news: "${content}". 
       Cross-reference with volatility in tokens like BTC, ETH, SOL, HYPE, SUI, LINK.
       Output MUST be strict JSON.
@@ -289,10 +286,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       setLatestForecast(forecast);
       setForecastStatus('active');
       
-      // Update memory ref
-      lastAnalyzedRef.current = { id: recordId, content };
+      lastAnalyzedRef.current = { id: recordId, content, apiKey };
       
-      // Update persistent storage cache
       try {
         const cacheRaw = localStorage.getItem(INTEL_CACHE_KEY);
         const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
@@ -335,13 +330,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     fetchData();
   }, []);
 
-  // Trigger analysis ONLY when latest news changes
+  // React to news OR key changes immediately
   useEffect(() => {
     const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
     if (latestNews) {
       analyzeNewsImpact(latestNews.content, latestNews.id);
     }
-  }, [userRecords, analyzeNewsImpact]);
+  }, [userRecords, analyzeNewsImpact, userApiKey]);
 
   const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
   const highVolatilityCount = useMemo(() => allCrypto.filter(c => Math.abs(c.change_24h) > 5).length, [allCrypto]);
@@ -531,7 +526,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                     onClick={() => {
                       const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
                       if (latestNews) {
-                        // Force analysis by ignoring cache
                         analyzeNewsImpact(latestNews.content, latestNews.id, true);
                       }
                     }}

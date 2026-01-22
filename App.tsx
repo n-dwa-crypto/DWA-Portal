@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { dbService } from './services/mockDb';
 import { ConnectionStatus, DbRecord, RecordType, SystemStats } from './types';
@@ -14,7 +13,6 @@ import {
   Home, 
   RefreshCw, 
   Cpu,
-  Lock,
   Key,
   Eye,
   EyeOff,
@@ -29,23 +27,22 @@ const App: React.FC = () => {
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // API Key Management
-  const [userApiKey, setUserApiKey] = useState<string>(localStorage.getItem('dwa_user_api_key') || '');
-  const [urlApiKey, setUrlApiKey] = useState<string>('');
+  // API Key Management - Initialized with absolute URL priority
+  const [userApiKey, setUserApiKey] = useState<string>(() => {
+    // Immediate check of URL on first render
+    const params = new URLSearchParams(window.location.search);
+    const keyParam = params.get('key');
+    if (keyParam && keyParam.trim() !== '') return keyParam.trim();
+    
+    // Fallback to localStorage
+    const savedKey = localStorage.getItem('dwa_user_api_key');
+    return savedKey || '';
+  });
+  
   const [showKey, setShowKey] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
   const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
-
-  // Detect Key in URL on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const keyParam = params.get('key');
-    if (keyParam) {
-      setUrlApiKey(keyParam);
-    }
-  }, []);
 
   const handleSaveKey = () => {
     localStorage.setItem('dwa_user_api_key', userApiKey);
@@ -84,6 +81,15 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [refreshData]);
 
+  // Sync state if URL changes (robustness for single-page sessions)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const keyParam = params.get('key');
+    if (keyParam && keyParam !== userApiKey) {
+      setUserApiKey(keyParam);
+    }
+  }, [userApiKey]);
+
   const LogoImage = () => (
     <img 
       src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=146,fit=crop/mP4MZ3DvE9fbN33K/dwa-logo---original-size-AGBbqzN3p1TJKPJO.png"
@@ -93,8 +99,9 @@ const App: React.FC = () => {
   );
 
   const getKeyStatus = () => {
-    if (userApiKey) return { text: 'Manual Key Active', color: 'bg-emerald-500' };
-    if (urlApiKey) return { text: 'URL Key Active', color: 'bg-blue-500' };
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('key')) return { text: 'URL Key Active', color: 'bg-blue-500' };
+    if (localStorage.getItem('dwa_user_api_key')) return { text: 'Manual Key Active', color: 'bg-emerald-500' };
     return { text: 'System Key Active', color: 'bg-slate-500' };
   };
 
@@ -128,9 +135,6 @@ const App: React.FC = () => {
               <LayoutDashboard size={22} className={activeTab === 'portal' ? 'text-blue-400' : 'group-hover:text-blue-300'} />
               <span className="font-medium text-lg">Admin Portal</span>
             </div>
-            {errorMessage && (
-              <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.8)]"></div>
-            )}
           </button>
           <button onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group ${activeTab === 'history' ? 'bg-white/10 text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
             <History size={22} className={activeTab === 'history' ? 'text-purple-400' : 'group-hover:text-purple-300'} />
@@ -143,9 +147,9 @@ const App: React.FC = () => {
                  <Cpu size={12} /> System Status
               </div>
               <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${errorMessage ? 'bg-rose-500' : keyInfo.color}`}></div>
+                 <div className={`w-2 h-2 rounded-full ${keyInfo.color}`}></div>
                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                   {errorMessage ? 'Link Alert' : keyInfo.text}
+                   {keyInfo.text}
                  </span>
               </div>
            </div>
@@ -183,16 +187,6 @@ const App: React.FC = () => {
                       </div>
                   </div>
 
-                  {errorMessage && (
-                    <div className="mb-10 p-6 bg-rose-500/10 border border-rose-500/20 rounded-[32px] flex items-start gap-5 animate-in fade-in slide-in-from-top-4">
-                        <AlertCircle size={32} className="text-rose-400 shrink-0 mt-1" />
-                        <div>
-                           <p className="text-md font-black text-rose-100 mb-1 uppercase tracking-tight">Signal Link Interrupted</p>
-                           <p className="text-sm text-rose-300 leading-relaxed font-medium">{errorMessage}</p>
-                        </div>
-                    </div>
-                  )}
-
                   <div className="space-y-6">
                       <div className="relative">
                           <input 
@@ -211,7 +205,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex flex-col md:flex-row justify-between items-center gap-6 px-4">
                           <p className="text-[11px] text-slate-500 font-bold max-w-lg leading-relaxed">
-                            Bypass system-wide rate limits by providing your own key. If no manual key is set, the system will check for a key in the URL parameter (?key=...) before falling back to the system default.
+                            Bypass system-wide rate limits by providing your own key. Keys in the URL parameter (?key=...) are automatically detected on load.
                           </p>
                           <button 
                             onClick={handleSaveKey}
