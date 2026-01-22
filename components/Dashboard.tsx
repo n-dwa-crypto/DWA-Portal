@@ -160,7 +160,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   };
 
   const getEffectiveApiKey = useCallback(() => {
-    return sanitizeApiKey(userApiKey || process.env.API_KEY);
+    // Priority 1: User-entered Manual Key
+    if (userApiKey) return sanitizeApiKey(userApiKey);
+    
+    // Priority 2: URL parameter Key
+    const params = new URLSearchParams(window.location.search);
+    const urlKey = params.get('key');
+    if (urlKey) return sanitizeApiKey(urlKey);
+    
+    // Priority 3: System default (process.env)
+    return sanitizeApiKey(process.env.API_KEY);
   }, [userApiKey]);
 
   const analyzeNewsImpact = useCallback(async (content: string, recordId: string, force = false) => {
@@ -457,7 +466,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
              <div className="bg-black/40 backdrop-blur-xl border border-white/5 rounded-[40px] p-8 flex-1 flex flex-col shadow-2xl overflow-hidden group">
                 <h3 className="font-black text-sm text-white flex items-center gap-2 uppercase tracking-widest mb-4 text-amber-400">
                    <Bitcoin size={16} />
-                   Market Coins
+                   Crypto Coins
                 </h3>
                 <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                    {cryptoStable.map((item, i) => <CryptoRow key={i} item={item} />)}
@@ -467,7 +476,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
              <div className="bg-black/40 backdrop-blur-xl border border-white/5 rounded-[40px] p-8 flex-1 flex flex-col shadow-2xl overflow-hidden group">
                 <h3 className="font-black text-sm text-white flex items-center gap-2 uppercase tracking-widest mb-4 text-indigo-400">
                    <Globe size={16} />
-                   Network Tokens
+                   Crypto Tokens
                 </h3>
                 <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                    {cryptoAlt.map((item, i) => <CryptoRow key={i} item={item} />)}

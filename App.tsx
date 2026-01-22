@@ -19,19 +19,8 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
-  AlertCircle,
-  Chrome
+  AlertCircle
 } from 'lucide-react';
-
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
 
 const App: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
@@ -42,38 +31,21 @@ const App: React.FC = () => {
   
   // API Key Management
   const [userApiKey, setUserApiKey] = useState<string>(localStorage.getItem('dwa_user_api_key') || '');
+  const [urlApiKey, setUrlApiKey] = useState<string>('');
   const [showKey, setShowKey] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
-  const [hasGoogleKey, setHasGoogleKey] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
 
+  // Detect Key in URL on mount
   useEffect(() => {
-    const checkKey = async () => {
-      if (window.aistudio) {
-        try {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
-          setHasGoogleKey(hasKey);
-        } catch (e) {
-          console.debug("Optional key check failed");
-        }
-      }
-    };
-    checkKey();
-  }, []);
-
-  const handleLinkGoogle = async () => {
-    if (window.aistudio) {
-      try {
-        await window.aistudio.openSelectKey();
-        setHasGoogleKey(true);
-        setErrorMessage(null);
-      } catch (err) {
-        console.error("Failed to open key selector", err);
-      }
+    const params = new URLSearchParams(window.location.search);
+    const keyParam = params.get('key');
+    if (keyParam) {
+      setUrlApiKey(keyParam);
     }
-  };
+  }, []);
 
   const handleSaveKey = () => {
     localStorage.setItem('dwa_user_api_key', userApiKey);
@@ -120,6 +92,14 @@ const App: React.FC = () => {
     />
   );
 
+  const getKeyStatus = () => {
+    if (userApiKey) return { text: 'Manual Key Active', color: 'bg-emerald-500' };
+    if (urlApiKey) return { text: 'URL Key Active', color: 'bg-blue-500' };
+    return { text: 'System Key Active', color: 'bg-slate-500' };
+  };
+
+  const keyInfo = getKeyStatus();
+
   return (
     <div className="min-h-screen text-slate-100 font-sans flex flex-col md:flex-row relative z-10">
       
@@ -163,9 +143,9 @@ const App: React.FC = () => {
                  <Cpu size={12} /> System Status
               </div>
               <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${errorMessage ? 'bg-rose-500' : (hasGoogleKey || userApiKey ? 'bg-emerald-500' : 'bg-emerald-500/50')}`}></div>
+                 <div className={`w-2 h-2 rounded-full ${errorMessage ? 'bg-rose-500' : keyInfo.color}`}></div>
                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                   {errorMessage ? 'Link Alert' : (hasGoogleKey ? 'Cloud Key Active' : (userApiKey ? 'Manual Key Active' : 'Free Tier Active'))}
+                   {errorMessage ? 'Link Alert' : keyInfo.text}
                  </span>
               </div>
            </div>
@@ -201,17 +181,6 @@ const App: React.FC = () => {
                               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 opacity-70">Manage AI Signal Credentials</p>
                           </div>
                       </div>
-                      
-                      <div className="flex flex-wrap gap-3">
-                          <button 
-                            onClick={handleLinkGoogle}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 ${
-                              hasGoogleKey ? 'bg-emerald-500 text-white' : 'bg-white text-black hover:bg-slate-200'
-                            }`}
-                          >
-                             <Chrome size={16} /> {hasGoogleKey ? 'Google Account Linked' : 'Link Google Account'}
-                          </button>
-                      </div>
                   </div>
 
                   {errorMessage && (
@@ -225,11 +194,6 @@ const App: React.FC = () => {
                   )}
 
                   <div className="space-y-6">
-                      <div className="flex items-center gap-3">
-                        <div className="h-px flex-1 bg-white/10"></div>
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">or Manual Entry</span>
-                        <div className="h-px flex-1 bg-white/10"></div>
-                      </div>
                       <div className="relative">
                           <input 
                               type={showKey ? "text" : "password"}
@@ -247,7 +211,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex flex-col md:flex-row justify-between items-center gap-6 px-4">
                           <p className="text-[11px] text-slate-500 font-bold max-w-lg leading-relaxed">
-                            Bypass system-wide rate limits by providing your own key. Link your Google account above to use your personal cloud projects (Free or Paid).
+                            Bypass system-wide rate limits by providing your own key. If no manual key is set, the system will check for a key in the URL parameter (?key=...) before falling back to the system default.
                           </p>
                           <button 
                             onClick={handleSaveKey}
