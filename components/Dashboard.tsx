@@ -26,6 +26,8 @@ import {
 import { GoogleGenAI, Type } from "@google/genai";
 import { DbRecord, RecordType } from '../types';
 
+const INTEL_CACHE_KEY = 'dwa_intelligence_cache_v1';
+
 // --- UNIVERSAL COUNTRY LOOKUP ---
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
@@ -154,7 +156,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     if (!key) return '';
     const clean = String(key).trim().replace(/[\n\r\t]/g, '');
     if (clean === 'undefined' || clean === 'null' || !clean) return '';
-    // Strip any non-printable ASCII characters that break Headers.append
     return clean.replace(/[^\x20-\x7E]/g, '');
   };
 
@@ -162,11 +163,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     return sanitizeApiKey(userApiKey || process.env.API_KEY);
   }, [userApiKey]);
 
-  const analyzeNewsImpact = useCallback(async (content: string, recordId: string) => {
-    // 1. Strict Cache Check: If this specific record has already been analyzed, abort.
-    if (lastAnalyzedRef.current.id === recordId && lastAnalyzedRef.current.content === content) {
-      console.debug("Intelligence cache hit for:", recordId);
+  const analyzeNewsImpact = useCallback(async (content: string, recordId: string, force = false) => {
+    // 1. Memory Check: If this specific record has already been analyzed in THIS instance, skip.
+    if (!force && lastAnalyzedRef.current.id === recordId && lastAnalyzedRef.current.content === content) {
+      console.debug("Intelligence memory cache hit:", recordId);
       return;
+    }
+
+    // 2. Persistent Storage Check: Check if we have a saved response for this ID.
+    if (!force) {
+      try {
+        const cacheRaw = localStorage.getItem(INTEL_CACHE_KEY);
+        const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
+        if (cache[recordId]) {
+          console.debug("Intelligence persistent cache hit:", recordId);
+          setLatestForecast(cache[recordId]);
+          setForecastStatus('active');
+          lastAnalyzedRef.current = { id: recordId, content };
+          return;
+        }
+      } catch (e) {
+        console.warn("Failed to read intelligence cache");
+      }
     }
 
     const apiKey = getEffectiveApiKey();
@@ -262,8 +280,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       setLatestForecast(forecast);
       setForecastStatus('active');
       
-      // Update cache ref
+      // Update memory ref
       lastAnalyzedRef.current = { id: recordId, content };
+      
+      // Update persistent storage cache
+      try {
+        const cacheRaw = localStorage.getItem(INTEL_CACHE_KEY);
+        const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
+        cache[recordId] = forecast;
+        localStorage.setItem(INTEL_CACHE_KEY, JSON.stringify(cache));
+      } catch (e) {
+        console.warn("Failed to write to intelligence cache");
+      }
       
     } catch (e: any) {
       setForecastStatus('error');
@@ -449,7 +477,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         </div>
       </section>
 
-      {/* Tier 3 Relocated Intelligence Widget */}
+      {/* Tier 3 Intelligence Agent */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
@@ -494,9 +522,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                     onClick={() => {
                       const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
                       if (latestNews) {
-                        // Clear cache manually to force a fresh analysis
-                        lastAnalyzedRef.current = { id: null, content: null };
-                        analyzeNewsImpact(latestNews.content, latestNews.id);
+                        // Force analysis by ignoring cache
+                        analyzeNewsImpact(latestNews.content, latestNews.id, true);
                       }
                     }}
                     className="p-3 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all hover:scale-110 active:rotate-180 duration-500 shadow-xl"
@@ -531,8 +558,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                 <button onClick={() => {
                    const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
                    if (latestNews) {
-                     lastAnalyzedRef.current = { id: null, content: null };
-                     analyzeNewsImpact(latestNews.content, latestNews.id);
+                     analyzeNewsImpact(latestNews.content, latestNews.id, true);
                    }
                 }} className="text-[10px] font-black uppercase tracking-widest text-white px-6 py-2.5 bg-rose-500 rounded-full hover:bg-rose-600 transition-colors">Retry Handshake</button>
             </div>
