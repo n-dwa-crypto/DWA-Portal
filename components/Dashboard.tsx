@@ -12,22 +12,19 @@ import {
   Bitcoin, 
   Globe, 
   Loader2, 
-  MapPin,
   RefreshCw,
   WifiOff,
   ShieldCheck,
   AlertCircle,
   Clock,
   Zap,
-  Lock,
   AlertTriangle
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { DbRecord, RecordType } from '../types';
 
-const INTEL_CACHE_KEY = 'dwa_intelligence_cache_v1';
+const INTEL_CACHE_KEY = 'dwa_intelligence_cache_v3';
 
-// --- UNIVERSAL COUNTRY LOOKUP ---
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
 const getCountryName = (code: string) => {
@@ -39,7 +36,6 @@ const getCountryName = (code: string) => {
   }
 };
 
-// --- TYPES FOR INTELLIGENCE ---
 export interface IntelligenceData {
   correlations: Array<{
     entity_name: string;
@@ -62,8 +58,6 @@ export interface IntelligenceData {
 }
 
 export type AIStatus = 'connecting' | 'active' | 'fallback' | 'error';
-
-// --- HELPER COMPONENTS ---
 
 interface CryptoRowProps {
   item: any;
@@ -141,14 +135,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Intelligence State
   const [latestForecast, setLatestForecast] = useState<IntelligenceData | null>(null);
   const [isForecasting, setIsForecasting] = useState(false);
   const [forecastStatus, setForecastStatus] = useState<AIStatus>('connecting');
   const [analysisTime, setAnalysisTime] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Caching mechanism to prevent redundant API calls on focus/re-render
   const lastAnalyzedRef = useRef<{ id: string | null; content: string | null; apiKey: string | null }>({ id: null, content: null, apiKey: null });
 
   const sanitizeApiKey = (key: string | undefined): string => {
@@ -159,17 +151,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   };
 
   const getEffectiveApiKey = useCallback(() => {
-    // Priority: Prop value (synced in App root from URL/Local/Manual)
     if (userApiKey && userApiKey.trim() !== '') return sanitizeApiKey(userApiKey);
-    
-    // Fallback: System default
     return sanitizeApiKey(process.env.API_KEY);
   }, [userApiKey]);
 
   const analyzeNewsImpact = useCallback(async (content: string, recordId: string, force = false) => {
     const apiKey = getEffectiveApiKey();
 
-    // Prevent redundant calls if content, ID, and API Key are unchanged
     if (!force && 
         lastAnalyzedRef.current.id === recordId && 
         lastAnalyzedRef.current.content === content && 
@@ -188,13 +176,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
           return;
         }
       } catch (e) {
-        console.warn("Failed to read intelligence cache");
+        console.warn("Cache read error");
       }
     }
 
     if (!apiKey) {
       setForecastStatus('fallback');
-      setErrorMessage("Intelligence Node Offline: No API credentials found in URL or configuration.");
+      setErrorMessage("Neural Node Offline: No API credentials detected.");
       return;
     }
 
@@ -204,12 +192,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     const startTime = performance.now();
     
     try {
-      // Reverted to default endpoint
       const ai = new GoogleGenAI({ apiKey: apiKey });
       
-      const prompt = `Act as a senior market risk intelligence agent. High-intensity analysis required for this crypto news: "${content}". 
-      Cross-reference with volatility in tokens like BTC, ETH, SOL, HYPE, SUI, LINK.
-      Output MUST be strict JSON.
+      const prompt = `Act as a high-level DWA Market Intelligence Agent. 
+      Analyze this news item for entity risks and crypto correlations: "${content}". 
+      Focus on tokens like BTC, ETH, SOL, TRUMP, MELANIA, PEPE, LINK, HYPE.
+      Include specific mentions of volatility risks for the Trump family coins if mentioned.
+      Output STRICT JSON.
       
       Schema:
       {
@@ -277,15 +266,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       });
 
       const responseText = response.text;
-      if (!responseText) throw new Error("Empty Neural Transmission");
-
+      if (!responseText) {
+        throw new Error("Neural response was empty");
+      }
       const forecast: IntelligenceData = JSON.parse(responseText);
       const endTime = performance.now();
       
       setAnalysisTime(Math.round(endTime - startTime));
       setLatestForecast(forecast);
       setForecastStatus('active');
-      
       lastAnalyzedRef.current = { id: recordId, content, apiKey };
       
       try {
@@ -293,13 +282,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
         cache[recordId] = forecast;
         localStorage.setItem(INTEL_CACHE_KEY, JSON.stringify(cache));
-      } catch (e) {
-        console.warn("Failed to write to intelligence cache");
-      }
+      } catch (e) {}
       
     } catch (e: any) {
       setForecastStatus('error');
-      setErrorMessage(e.message || "Intelligence Link Failure: Connection timed out.");
+      setErrorMessage(e.message || "Intelligence Link Failure.");
     } finally {
       setIsForecasting(false);
     }
@@ -314,7 +301,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
           fetch('data/crypto_stable.json').catch(() => fetch('./data/crypto_stable.json')),
           fetch('data/crypto_alt.json').catch(() => fetch('./data/crypto_alt.json'))
         ]);
-        if (!sanctionsRes.ok || !stableRes.ok || !altRes.ok) throw new Error('Data Sync Failure');
         const [sanctionsData, stableData, altData] = await Promise.all([
           sanctionsRes.json(), stableRes.json(), altRes.json()
         ]);
@@ -322,7 +308,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         setCryptoStable(stableData);
         setCryptoAlt(altData);
       } catch (err) {
-        console.warn("Dashboard sync error:", err);
+        console.warn("Data sync skipped or partially failed (bootstrap mode active)");
       } finally {
         setIsLoading(false);
       }
@@ -345,16 +331,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     return [...allCrypto].sort((a, b) => Math.abs(b.change_24h) - Math.abs(a.change_24h))[0];
   }, [allCrypto]);
 
-  const { topCountry } = useMemo(() => {
+  const topCountry = useMemo(() => {
     const freq: Record<string, number> = {};
     sanctions.forEach(s => { if (s.country_code) freq[s.country_code] = (freq[s.country_code] || 0) + 1; });
     const entries = Object.entries(freq).sort((a, b) => b[1] - a[1]);
-    return { topCountry: entries.length > 0 ? { code: entries[0][0], count: entries[0][1] } : null };
+    return entries.length > 0 ? { code: entries[0][0], count: entries[0][1] } : null;
   }, [sanctions]);
 
   return (
     <div className="max-w-[1800px] mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
-      {/* Header */}
       <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden group">
          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-indigo-500"></div>
          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-emerald-200 mb-2 tracking-tight text-white group-hover:scale-[1.01] transition-transform duration-700">
@@ -363,7 +348,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
          <p className="text-slate-400 font-medium opacity-80 uppercase tracking-widest text-[10px] font-black">AI Risk Node | News & Multi-Feed Integration</p>
       </div>
 
-      {/* Tier 1 monitoring stats */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
@@ -438,7 +422,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         </div>
       </section>
 
-      {/* Tier 2 registry lists */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
@@ -481,7 +464,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         </div>
       </section>
 
-      {/* Tier 3 Intelligence Agent */}
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-2">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
@@ -530,19 +512,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                       }
                     }}
                     className="p-3 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all hover:scale-110 active:rotate-180 duration-500 shadow-xl"
-                    title="Force Signal Refresh"
                   >
                     <RefreshCw size={18} className={isForecasting ? 'animate-spin' : ''} />
                   </button>
               </div>
           </div>
-
-          {!latestForecast && !isForecasting && !errorMessage && (
-            <div className="h-64 flex flex-col items-center justify-center text-slate-500 border border-dashed border-white/10 rounded-[32px] bg-black/20">
-                <BrainCircuit size={48} className="opacity-20 mb-4" />
-                <p className="font-black uppercase text-[10px] tracking-[0.3em]">Awaiting Data Feed to Trigger Agentic Inference</p>
-            </div>
-          )}
 
           {isForecasting && (
             <div className="h-64 flex items-center justify-center bg-black/40 rounded-[32px] border border-white/5">
@@ -553,16 +527,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
             </div>
           )}
 
-          {errorMessage && (
+          {errorMessage && !isForecasting && (
             <div className="h-64 flex flex-col items-center justify-center text-rose-500/50 border border-dashed border-rose-500/20 rounded-[32px] bg-rose-500/5 p-8 text-center">
                 <AlertCircle size={48} className="opacity-40 mb-4" />
                 <p className="font-black uppercase text-[10px] tracking-[0.2em] mb-2">Signal Connection Failure</p>
                 <p className="text-xs text-rose-300/60 font-medium max-w-sm mb-6">{errorMessage}</p>
                 <button onClick={() => {
                    const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
-                   if (latestNews) {
-                     analyzeNewsImpact(latestNews.content, latestNews.id, true);
-                   }
+                   if (latestNews) analyzeNewsImpact(latestNews.content, latestNews.id, true);
                 }} className="text-[10px] font-black uppercase tracking-widest text-white px-6 py-2.5 bg-rose-500 rounded-full hover:bg-rose-600 transition-colors">Retry Handshake</button>
             </div>
           )}
@@ -619,16 +591,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                               <div className={`absolute top-0 right-0 w-1 h-full transition-colors ${
                                  rec.priority === 'HIGH' ? 'bg-rose-500' : 'bg-amber-500/50'
                               }`}></div>
-                              
                               <div className="flex items-center justify-between mb-4">
                                 <h4 className="font-black text-slate-100 uppercase text-xs tracking-[0.2em]">{rec.action}</h4>
                                 <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
                                     rec.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-white/5 text-slate-400 border-white/10'
                                 }`}>{rec.priority} PRIORITY</span>
                               </div>
-                              
                               <p className="text-slate-400 text-sm leading-relaxed font-medium mb-6">{rec.description}</p>
-                              
                               <div className="pt-6 border-t border-white/5 flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Zap size={12} className="text-slate-600" />
