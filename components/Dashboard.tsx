@@ -418,10 +418,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       </div>
 
       <section className="space-y-4">
-        <div className="flex items-center gap-3 px-2">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 1 • Operational Monitoring</span>
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div className="flex items-center gap-6 px-4 mb-4">
+            <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
+            <span className="text-xs font-black tracking-[0.4em] text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">Tier 1: Operational Monitoring</span>
+            <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -492,10 +492,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center gap-3 px-2">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 2 • Deep Intelligence</span>
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div className="flex items-center gap-6 px-4 mb-4">
+            <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
+            <span className="text-xs font-black tracking-[0.4em] text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">Tier 2: Statistical Intelligence</span>
+            <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
@@ -534,10 +534,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center gap-3 px-2">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            <span className="text-[10px] font-black tracking-[0.3em] text-slate-500 uppercase">Tier 3 • Intelligence Agent</span>
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div className="flex items-center gap-6 px-4 mb-4">
+            <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
+            <span className="text-xs font-black tracking-[0.4em] text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">Tier 3: Agentic Intelligence</span>
+            <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
         </div>
 
         <div className="bg-gradient-to-br from-blue-900/40 to-indigo-900/40 backdrop-blur-3xl border border-blue-500/20 rounded-[40px] p-10 shadow-2xl relative overflow-hidden transition-all duration-700">
