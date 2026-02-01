@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Send, Loader2, FileText, ShieldAlert } from 'lucide-react';
+import { Send, Loader2, FileText, ShieldAlert, Heart } from 'lucide-react';
 import { RecordType } from '../types';
 
 interface ActionWidgetProps {
@@ -32,6 +32,7 @@ export const ActionWidget: React.FC<ActionWidgetProps> = ({ type, onSubmit, titl
 
   const isNews = type === RecordType.NEWS;
   const isSanction = type === RecordType.SANCTION;
+  const isThankYou = type === RecordType.THANK_YOU;
   
   let gradientClass = 'from-rose-500 to-orange-600 shadow-rose-500/20';
   let accentColor = 'bg-rose-500';
@@ -41,11 +42,16 @@ export const ActionWidget: React.FC<ActionWidgetProps> = ({ type, onSubmit, titl
     gradientClass = 'from-blue-500 to-indigo-600 shadow-blue-500/20';
     accentColor = 'bg-blue-500';
     Icon = FileText;
+  } else if (isThankYou) {
+    gradientClass = 'from-pink-500 to-rose-400 shadow-pink-500/20';
+    accentColor = 'bg-pink-500';
+    Icon = Heart;
   }
 
   const getPlaceholder = () => {
     if (isNews) return "Type the latest crypto news here...";
-    if (isSanction) return "Enter details for new sanction entry (Name, ID, Reason)...";
+    if (isSanction) return "Enter details for new sanction entry...";
+    if (isThankYou) return "Enter your thank you message or appreciation note...";
     return "Enter details...";
   };
 

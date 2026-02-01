@@ -1,7 +1,8 @@
 
 export enum RecordType {
   NEWS = 'NEWS',
-  SANCTION = 'SANCTION'
+  SANCTION = 'SANCTION',
+  THANK_YOU = 'THANK_YOU'
 }
 
 export interface DbRecord {
@@ -10,6 +11,7 @@ export interface DbRecord {
   content: string;
   timestamp: number;
   synced: boolean;
+  intelligence?: any; // Added to support cloud-synced AI analysis
 }
 
 export enum ConnectionStatus {
