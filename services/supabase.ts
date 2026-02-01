@@ -29,10 +29,12 @@ class SupabaseService {
   public async checkHealth(dbKey?: string): Promise<DbHealthStatus> {
     const client = dbKey ? this.getAdminClient(dbKey) : this.publicClient;
     try {
-      const { error } = await client.from('dwa_records').select('id').limit(1);
+      // Fix: Destructure 'status' from the response as it is not a property of PostgrestError
+      const { error, status } = await client.from('dwa_records').select('id').limit(1);
       if (!error) return 'ready';
       if (error.code === '42P01' || error.message?.includes('does not exist')) return 'missing_table';
-      if (error.code === '42501' || error.status === 401 || error.status === 403) return 'unauthorized';
+      // Fix: Check status from the response object instead of error.status
+      if (error.code === '42501' || status === 401 || status === 403) return 'unauthorized';
       return 'error';
     } catch (e) {
       return 'error';
