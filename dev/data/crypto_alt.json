@@ -1,0 +1,177 @@
+[
+  {
+    "rank": 11,
+    "symbol": "BNB",
+    "name": "BNB",
+    "price": 612.45,
+    "change_24h": 1.2
+  },
+  {
+    "rank": 12,
+    "symbol": "DOGE",
+    "name": "Dogecoin",
+    "price": 0.16,
+    "change_24h": -4.5
+  },
+  {
+    "rank": 13,
+    "symbol": "TRX",
+    "name": "TRON",
+    "price": 0.2,
+    "change_24h": 0.85
+  },
+  {
+    "rank": 14,
+    "symbol": "HYPE",
+    "name": "Hyperliquid",
+    "price": 34.82,
+    "change_24h": -2.15
+  },
+  {
+    "rank": 15,
+    "symbol": "LINK",
+    "name": "Chainlink",
+    "price": 18.25,
+    "change_24h": 2.15
+  },
+  {
+    "rank": 16,
+    "symbol": "SUI",
+    "name": "Sui",
+    "price": 1.85,
+    "change_24h": 7.2
+  },
+  {
+    "rank": 17,
+    "symbol": "LTC",
+    "name": "Litecoin",
+    "price": 92.4,
+    "change_24h": 0.3
+  },
+  {
+    "rank": 18,
+    "symbol": "XMR",
+    "name": "Monero",
+    "price": 162.15,
+    "change_24h": -0.1
+  },
+  {
+    "rank": 19,
+    "symbol": "UNI",
+    "name": "Uniswap",
+    "price": 12.4,
+    "change_24h": -3.2
+  },
+  {
+    "rank": 20,
+    "symbol": "NEAR",
+    "name": "Protocol",
+    "price": 5.22,
+    "change_24h": 5.1
+  },
+  {
+    "rank": 21,
+    "symbol": "AAVE",
+    "name": "Aave",
+    "price": 148.5,
+    "change_24h": -1.15
+  },
+  {
+    "rank": 22,
+    "symbol": "PEPE",
+    "name": "Pepe",
+    "price": 0.000009,
+    "change_24h": 12.4
+  },
+  {
+    "rank": 23,
+    "symbol": "BONK",
+    "name": "Bonk",
+    "price": 0.000028,
+    "change_24h": 8.1
+  },
+  {
+    "rank": 24,
+    "symbol": "GRT",
+    "name": "Graph",
+    "price": 0.22,
+    "change_24h": 1.1
+  },
+  {
+    "rank": 25,
+    "symbol": "JUP",
+    "name": "Jupiter",
+    "price": 0.92,
+    "change_24h": 4.5
+  },
+  {
+    "rank": 26,
+    "symbol": "RENDER",
+    "name": "Render",
+    "price": 7.45,
+    "change_24h": 6.2
+  },
+  {
+    "rank": 27,
+    "symbol": "STX",
+    "name": "Stacks",
+    "price": 1.95,
+    "change_24h": 3.15
+  },
+  {
+    "rank": 28,
+    "symbol": "PYTH",
+    "name": "Network",
+    "price": 0.42,
+    "change_24h": -2.15
+  },
+  {
+    "rank": 29,
+    "symbol": "TON",
+    "name": "Toncoin",
+    "price": 5.15,
+    "change_24h": 1.4
+  },
+  {
+    "rank": 30,
+    "symbol": "MATIC",
+    "name": "Polygon",
+    "price": 0.56,
+    "change_24h": 0.45
+  },
+  {
+    "rank": 31,
+    "symbol": "BCH",
+    "name": "Cash",
+    "price": 420.5,
+    "change_24h": 1.25
+  },
+  {
+    "rank": 32,
+    "symbol": "STLR",
+    "name": "Stellar",
+    "price": 0.11,
+    "change_24h": -0.8
+  },
+  {
+    "rank": 33,
+    "symbol": "HBAR",
+    "name": "Hedera",
+    "price": 0.07,
+    "change_24h": 1.5
+  },
+  {
+    "rank": 34,
+    "symbol": "ARB",
+    "name": "Arbitrum",
+    "price": 0.94,
+    "change_24h": -2.3
+  },
+  {
+    "rank": 35,
+    "symbol": "APT",
+    "name": "Aptos",
+    "price": 8.12,
+    "change_24h": -1.1
+  }
+]
