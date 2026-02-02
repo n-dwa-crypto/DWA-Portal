@@ -25,7 +25,6 @@ import {
   ShieldX,
   Layers
 } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
 import { DbRecord, RecordType } from '../types';
 import { supabaseService } from '../services/supabase';
 
@@ -233,20 +232,20 @@ interface CryptoRowProps {
 const CryptoRow: React.FC<CryptoRowProps> = ({ item }) => {
   const isPositive = (item.change_24h || 0) >= 0;
   return (
-    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-all border border-white/5 group">
-      <div className="flex items-center gap-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black ring-1 ring-white/10 ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+    <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 hover:bg-white/10 transition-all border border-white/5 group">
+      <div className="flex items-center gap-3">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black ring-1 ring-white/10 ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
            {item.symbol ? item.symbol.slice(0, 3) : '?'}
         </div>
         <div>
-          <div className="font-black text-sm text-white group-hover:text-blue-400 transition-colors">{item.symbol}</div>
-          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.name}</div>
+          <div className="font-black text-xs text-white group-hover:text-blue-400 transition-colors leading-tight">{item.symbol}</div>
+          <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{item.name}</div>
         </div>
       </div>
       <div className="text-right">
-        <div className="font-mono text-sm font-bold text-white tracking-tight">${item.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
-        <div className={`text-[10px] font-black flex items-center justify-end gap-1 mt-0.5 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-           {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+        <div className="font-mono text-xs font-bold text-white tracking-tight leading-tight">${item.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
+        <div className={`text-[9px] font-black flex items-center justify-end gap-1 mt-0.5 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+           {isPositive ? <TrendingUp size={8} /> : <TrendingDown size={8} />}
            {Math.abs(item.change_24h || 0).toFixed(2)}%
         </div>
       </div>
@@ -290,11 +289,10 @@ const SanctionRow: React.FC<SanctionRowProps> = ({ item }) => {
 
 interface DashboardProps {
   userRecords?: DbRecord[];
-  userApiKey?: string;
   onPromoteRecord?: (id: string) => Promise<void>;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiKey, onPromoteRecord }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], onPromoteRecord }) => {
   const [sanctions, setSanctions] = useState<any[]>([]);
   const [cryptoStable, setCryptoStable] = useState<any[]>([]);
   const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
@@ -306,19 +304,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
 
   // Ref to track manual mode to prevent initial useEffect from overriding the cycle
   const manualCycleMode = useRef(false);
-
-  const sanitizeApiKey = (key: any): string => {
-    if (!key) return '';
-    const clean = String(key).trim();
-    if (clean === 'undefined' || clean === 'null' || !clean) return '';
-    return clean.replace(/[^\x20-\x7E]/g, '');
-  };
-
-  const getEffectiveApiKey = useCallback(() => {
-    if (userApiKey && userApiKey.trim() !== '') return sanitizeApiKey(userApiKey);
-    const envKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
-    return sanitizeApiKey(envKey);
-  }, [userApiKey]);
 
   const loadLatestIntelligence = useCallback(async (content?: string, recordId?: string, isManualCycle = false) => {
     try {
@@ -337,12 +322,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         manualCycleMode.current = true;
         const nextIndex = (cycleIndex + 1) % CYCLE_IDS.length;
         const nextId = CYCLE_IDS[nextIndex];
-        // Promoting the record will trigger a global state update via App.tsx
-        // which will eventually call this function again with the promoted recordId
         await onPromoteRecord(nextId);
         return;
       } else {
-        // Only run this if not in manual mode or if strictly requested
         let target = 0;
         if (recordId === 'news-fiscal-uncertainty-2025') target = 1;
         else if (recordId === 'news-illicit-activity-2025') target = 2;
@@ -400,7 +382,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   useEffect(() => {
     const autoCycle = setInterval(() => {
       loadLatestIntelligence(undefined, undefined, true);
-    }, 60000); // 60 seconds
+    }, 60000); 
     
     return () => clearInterval(autoCycle);
   }, [loadLatestIntelligence]);
@@ -542,10 +524,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
            </div>
 
            {/* Market Assets - Side by Side below Registry */}
-           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 min-h-[600px]">
+           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
               {/* Crypto Coin */}
-              <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl">
-                 <div className="p-8 border-b border-white/5 bg-black/20 flex items-center justify-between">
+              <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl h-[400px]">
+                 <div className="p-6 border-b border-white/5 bg-black/20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                        <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl">
                           <Bitcoin size={20} />
@@ -556,7 +538,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                        </div>
                     </div>
                  </div>
-                 <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                 <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar bg-black/10">
                     {cryptoStable.map((item, idx) => (
                        <CryptoRow key={idx} item={item} />
                     ))}
@@ -564,8 +546,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
               </div>
 
               {/* Crypto Tokens */}
-              <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl">
-                 <div className="p-8 border-b border-white/5 bg-black/20 flex items-center justify-between">
+              <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl h-[400px]">
+                 <div className="p-6 border-b border-white/5 bg-black/20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                        <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
                           <Layers size={20} />
@@ -576,7 +558,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                        </div>
                     </div>
                  </div>
-                 <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                 <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar bg-black/10">
                     {cryptoAlt.map((item, idx) => (
                        <CryptoRow key={idx} item={item} />
                     ))}
@@ -605,7 +587,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                   ) : forecastStatus === 'active' ? (
                     <div className="flex items-center gap-3 px-8 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.1)]">
                        <ShieldCheck size={24} className="text-emerald-400" />
-                       <span className="text-xs font-black text-emerald-200 uppercase tracking-[0.3em]">Neural Core Active</span>
+                       <span className="text-xs font-black text-blue-200 uppercase tracking-[0.3em]">Neural Core Active</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3 px-8 py-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl">

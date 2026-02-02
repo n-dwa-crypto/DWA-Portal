@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { dbService } from './services/mockDb';
 import { supabaseService, CloudRecord, DbHealthStatus } from './services/supabase';
@@ -56,15 +57,6 @@ const App: React.FC = () => {
     } catch (e) { return ''; }
   });
 
-  const [userApiKey, setUserApiKey] = useState<string>(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const keyParam = params.get('key');
-      if (keyParam && keyParam.trim() !== '') return keyParam.trim();
-      return localStorage.getItem('dwa_user_api_key') || '';
-    } catch (e) { return ''; }
-  });
-
   const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
 
   const toggleAdmin = () => {
@@ -84,9 +76,7 @@ const App: React.FC = () => {
     } catch (e) {}
   };
 
-  const [showKey, setShowKey] = useState(false);
   const [showDbKey, setShowDbKey] = useState(false);
-  const [keySaved, setKeySaved] = useState(false);
   const [dbKeySaved, setDbKeySaved] = useState(false);
 
   const checkDbReady = useCallback(async (currentKey?: string) => {
@@ -133,10 +123,12 @@ const App: React.FC = () => {
     await refreshData();
   };
 
+  // generateIntelligence updated to strictly use process.env.API_KEY as per guidelines
   const generateIntelligence = async (content: string): Promise<IntelligenceData | null> => {
-    const apiKey = userApiKey || (typeof process !== 'undefined' ? process.env.API_KEY : '');
+    const apiKey = process.env.API_KEY;
     if (!apiKey) return null;
     try {
+      // Always initialize the client with the named apiKey parameter
       const ai = new GoogleGenAI({ apiKey });
       const prompt = `Analyze this news for entity risks and crypto correlations: "${content}". Focus on BTC, ETH, SOL, TRUMP. 
 
@@ -200,6 +192,7 @@ REQUIREMENTS:
           }
         }
       });
+      // Extract generated text using the .text property
       return JSON.parse(response.text || '{}');
     } catch (e) {
       console.error("AI intelligence generation failed:", e);
@@ -249,14 +242,6 @@ CREATE POLICY "Allow admin write" ON dwa_records FOR INSERT WITH CHECK (true);`;
     try {
       navigator.clipboard.writeText(sql);
       alert("SQL Schema copied to clipboard!");
-    } catch (e) {}
-  };
-
-  const handleSaveKey = () => {
-    try {
-      localStorage.setItem('dwa_user_api_key', userApiKey);
-      setKeySaved(true);
-      setTimeout(() => setKeySaved(false), 3000);
     } catch (e) {}
   };
 
@@ -362,7 +347,8 @@ CREATE POLICY "Allow admin write" ON dwa_records FOR INSERT WITH CHECK (true);`;
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-10 scroll-smooth custom-scrollbar">
-          {activeTab === 'dashboard' && <Dashboard userRecords={records} userApiKey={userApiKey} onPromoteRecord={handlePromoteRecord} />}
+          {/* Fix: Removed unused userApiKey prop to resolve TypeScript error */}
+          {activeTab === 'dashboard' && <Dashboard userRecords={records} onPromoteRecord={handlePromoteRecord} />}
 
           {activeTab === 'portal' && isAdmin && (
             <div className="max-w-7xl mx-auto space-y-10 pb-20">
@@ -434,39 +420,8 @@ CREATE POLICY "Admin Write" ON dwa_records FOR INSERT WITH CHECK (true);`}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 p-1 shadow-2xl overflow-hidden group hover:border-blue-500/30 transition-all">
-                  <div className="bg-black/40 p-10 rounded-[38px] h-full flex flex-col">
-                    <div className="flex items-center gap-5 mb-10">
-                        <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-white/10">
-                            <Key size={32} />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-black text-white uppercase tracking-tight">AI Signal</h3>
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 opacity-70">Neural Analysis Key</p>
-                        </div>
-                    </div>
-                    <div className="space-y-6 flex-1 flex flex-col justify-between">
-                        <div className="relative">
-                            <input 
-                                type={showKey ? "text" : "password"}
-                                value={userApiKey}
-                                onChange={(e) => setUserApiKey(e.target.value)}
-                                placeholder="sk-gemini-intelligence-key..."
-                                className="w-full bg-black/40 border border-white/5 rounded-[24px] py-5 pl-8 pr-16 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-slate-700 transition-all"
-                            />
-                            <button onClick={() => setShowKey(!showKey)} className="absolute right-6 top-1/2 -translate-y-1/2 p-2 text-slate-600 hover:text-white transition-colors">
-                                {showKey ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
-                        </div>
-                        <button onClick={handleSaveKey} className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all ${keySaved ? 'bg-emerald-500 text-white' : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'}`}>
-                            {keySaved ? <CheckCircle2 size={16} /> : <RefreshCw size={16} />}
-                            {keySaved ? 'Settings Saved' : 'Apply AI Key'}
-                        </button>
-                    </div>
-                  </div>
-                </div>
-
+              <div className="max-w-2xl mx-auto w-full">
+                {/* Node Sync Card - Removed manual Gemini API Key management card as per guidelines */}
                 <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 p-1 shadow-2xl overflow-hidden group hover:border-emerald-500/30 transition-all">
                   <div className="bg-black/40 p-10 rounded-[38px] h-full flex flex-col">
                     <div className="flex items-center gap-5 mb-10">
