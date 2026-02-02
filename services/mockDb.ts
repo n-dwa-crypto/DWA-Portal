@@ -6,22 +6,14 @@ const BOOTSTRAP_ITEMS = [
     type: RecordType.NEWS,
     content: `Market Stress from US fiscal uncertainty weighs on crypto — BTC sliding
 • Bitcoin and broader digital assets are slipping sharply amid macro and political uncertainty in the U.S., even as lawmakers close in on avoiding a government shutdown.  
-• This kind of risk-off sentiment drives liquidations in crypto futures and worsens volatility, as markets repricing expectations for Fed policy, liquidity, and risk assets.  
-
-Why it matters (impact vector):
-• Macro/geopolitical risk is increasingly transmitted into crypto price action, undermining narratives that digital assets are decoupled from traditional markets.
-• Short-term traders de-risk; longer-term holders may reassess BTC/ETH valuations and institutional participation.`
+• This kind of risk-off sentiment drives liquidations in crypto futures and worsens volatility, as markets repricing expectations for Fed policy, liquidity, and risk assets.`
   },
   {
     id: 'news-illicit-activity-2025',
     type: RecordType.NEWS,
     content: `Global illicit crypto activity surges — $82B+ money laundering footprint
 • Researchers report that **crypto money-laundering hit at least $82 billion in 2025, driven by sophisticated networks and cross-border concealment tactics.  
-• This surge continues despite enforcement actions, highlighting how digital assets are intertwined with geopolitical pressures, sanction evasion, and criminal finance.
-
-Why it matters (impact vector):
-• Regulatory risk spikes: lawmakers and regulators typically tighten oversight and compliance when illicit flows expand.
-• Heightened enforcement leads to higher KYC/AML costs, could chill institutional inflows, and may pressure stablecoin & exchange frameworks.`
+• This surge continues despite enforcement actions, highlighting how digital assets are intertwined with geopolitical pressures, sanction evasion, and criminal finance.`
   },
   {
     id: 'bootstrap-news-trump-001',
