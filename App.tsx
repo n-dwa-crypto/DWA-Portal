@@ -65,13 +65,21 @@ const App: React.FC = () => {
     } catch (e) { return ''; }
   });
 
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
+
   const toggleAdmin = () => {
     const newAdminState = !isAdmin;
     setIsAdmin(newAdminState);
     try {
       const url = new URL(window.location.href);
       if (newAdminState) url.searchParams.set('user', 'admin');
-      else url.searchParams.delete('user');
+      else {
+        url.searchParams.delete('user');
+        // Reset tab to dashboard if admin is deactivated on a restricted tab
+        if (activeTab === 'portal' || activeTab === 'history') {
+          setActiveTab('dashboard');
+        }
+      }
       window.history.pushState({}, '', url);
     } catch (e) {}
   };
@@ -80,7 +88,6 @@ const App: React.FC = () => {
   const [showDbKey, setShowDbKey] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
   const [dbKeySaved, setDbKeySaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'portal' | 'history'>('dashboard');
 
   const checkDbReady = useCallback(async (currentKey?: string) => {
     const keyToUse = currentKey !== undefined ? currentKey : dbKey;
@@ -131,7 +138,13 @@ const App: React.FC = () => {
     if (!apiKey) return null;
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Analyze this news for entity risks and crypto correlations: "${content}". Focus on BTC, ETH, SOL, TRUMP. Output STRICT JSON.`;
+      const prompt = `Analyze this news for entity risks and crypto correlations: "${content}". Focus on BTC, ETH, SOL, TRUMP. 
+
+REQUIREMENTS:
+1. Output STRICT JSON.
+2. Provide at least 3 Strategic Directives in the intelligence.recommendations array.
+3. Ensure at least one directive is HIGH priority, at least one is MEDIUM priority, and at least one is LOW priority.`;
+
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
@@ -174,7 +187,7 @@ const App: React.FC = () => {
                     items: {
                       type: Type.OBJECT,
                       properties: {
-                        priority: { type: Type.STRING },
+                        priority: { type: Type.STRING, description: "Must be HIGH, MEDIUM, or LOW" },
                         action: { type: Type.STRING },
                         description: { type: Type.STRING },
                         assigned_to: { type: Type.STRING }
@@ -298,18 +311,20 @@ CREATE POLICY "Allow admin write" ON dwa_records FOR INSERT WITH CHECK (true);`;
           </button>
           
           {isAdmin && (
-            <button onClick={() => { setActiveTab('portal'); setMobileMenuOpen(false); }} className={`w-full flex items-center justify-between gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group ${activeTab === 'portal' ? 'bg-white/10 text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-              <div className="flex items-center gap-4">
-                <LayoutDashboard size={22} className={activeTab === 'portal' ? 'text-blue-400' : 'group-hover:text-blue-300'} />
-                <span className="font-medium text-lg">Admin Portal</span>
-              </div>
-            </button>
-          )}
+            <>
+              <button onClick={() => { setActiveTab('portal'); setMobileMenuOpen(false); }} className={`w-full flex items-center justify-between gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group ${activeTab === 'portal' ? 'bg-white/10 text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
+                <div className="flex items-center gap-4">
+                  <LayoutDashboard size={22} className={activeTab === 'portal' ? 'text-blue-400' : 'group-hover:text-blue-300'} />
+                  <span className="font-medium text-lg">Admin Portal</span>
+                </div>
+              </button>
 
-          <button onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group ${activeTab === 'history' ? 'bg-white/10 text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-            <History size={22} className={activeTab === 'history' ? 'text-purple-400' : 'group-hover:text-purple-300'} />
-            <span className="font-medium text-lg">Audit Log</span>
-          </button>
+              <button onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group ${activeTab === 'history' ? 'bg-white/10 text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
+                <History size={22} className={activeTab === 'history' ? 'text-purple-400' : 'group-hover:text-purple-300'} />
+                <span className="font-medium text-lg">Audit Log</span>
+              </button>
+            </>
+          )}
         </div>
         
         <div className="p-6 space-y-3">
@@ -331,7 +346,7 @@ CREATE POLICY "Allow admin write" ON dwa_records FOR INSERT WITH CHECK (true);`;
         <header className="hidden md:flex items-center justify-between px-10 py-6">
            <div>
              <h2 className="text-3xl font-bold text-white tracking-tight">
-               {activeTab === 'portal' ? 'Admin Portal' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+               {activeTab === 'portal' ? 'Admin Portal' : activeTab === 'history' ? 'Audit Log' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
              </h2>
              <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]">DWA Enterprise Terminal</p>
            </div>
@@ -508,18 +523,7 @@ CREATE POLICY "Admin Write" ON dwa_records FOR INSERT WITH CHECK (true);`}
             </div>
           )}
 
-          {activeTab === 'portal' && !isAdmin && (
-             <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500">
-                <AlertCircle size={48} className="mb-4 opacity-20" />
-                <h3 className="text-xl font-bold text-white uppercase tracking-widest">Access Restricted</h3>
-                <p className="text-sm font-medium opacity-60">Admin privileges required for this module.</p>
-                <button onClick={toggleAdmin} className="mt-6 px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full text-[11px] font-black uppercase tracking-widest text-white transition-all border border-white/10">
-                  Enable Simulated Admin Mode
-                </button>
-             </div>
-          )}
-
-          {activeTab === 'history' && (
+          {activeTab === 'history' && isAdmin && (
             <div className="max-w-5xl mx-auto pb-20">
                <div className="mb-8 flex items-center justify-between">
                     <div>
@@ -532,6 +536,17 @@ CREATE POLICY "Admin Write" ON dwa_records FOR INSERT WITH CHECK (true);`}
                </div>
                <Feed items={records} loading={isLoadingFeed} />
             </div>
+          )}
+
+          {(activeTab === 'portal' || activeTab === 'history') && !isAdmin && (
+             <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500">
+                <AlertCircle size={48} className="mb-4 opacity-20" />
+                <h3 className="text-xl font-bold text-white uppercase tracking-widest">Access Restricted</h3>
+                <p className="text-sm font-medium opacity-60">Admin privileges required for this module.</p>
+                <button onClick={toggleAdmin} className="mt-6 px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full text-[11px] font-black uppercase tracking-widest text-white transition-all border border-white/10">
+                  Enable Simulated Admin Mode
+                </button>
+             </div>
           )}
         </div>
       </main>

@@ -65,6 +65,18 @@ const INTEL_LIBRARY: IntelligenceData[] = [
           action: "Volatility Safeguard",
           description: "Initiate liquidity monitoring for $TRUMP holders ahead of the token distribution.",
           assigned_to: "Market Risk Division"
+        },
+        {
+          priority: "MEDIUM",
+          action: "Stakeholder Audit",
+          description: "Verify institutional connections between TMTG board members and offshore custodial nodes.",
+          assigned_to: "Legal Compliance"
+        },
+        {
+          priority: "LOW",
+          action: "Social Sentiment Monitoring",
+          description: "Track keyword frequency for '$MELANIA' on decentralized social platforms for early volatility signs.",
+          assigned_to: "Data Analytics"
         }
       ]
     }
@@ -102,6 +114,18 @@ const INTEL_LIBRARY: IntelligenceData[] = [
           action: "De-Risk Exposure",
           description: "Temporary reduction in altcoin leverage is advised during US fiscal deadlock phases.",
           assigned_to: "Macro Strategy Dept"
+        },
+        {
+          priority: "MEDIUM",
+          action: "Liquidity Buffering",
+          description: "Increase USDC reserves in protocol-owned treasuries to counter sudden SOL-based capital flight.",
+          assigned_to: "Treasury Management"
+        },
+        {
+          priority: "LOW",
+          action: "Rate Policy Briefing",
+          description: "Draft an internal report on the long-term impact of yield curve inversion on BTC institutional adoption.",
+          assigned_to: "Research Division"
         }
       ]
     }
@@ -139,6 +163,18 @@ const INTEL_LIBRARY: IntelligenceData[] = [
           action: "Audit Protocol Scan",
           description: "Increase monitoring on cross-border stablecoin flows exceeding $100k for potential laundered signatures.",
           assigned_to: "Financial Crimes Unit"
+        },
+        {
+          priority: "MEDIUM",
+          action: "Jurisdictional Review",
+          description: "Evaluate the risk profile of offshore exchanges currently facilitating XMR pairs without enhanced KYC.",
+          assigned_to: "Regulatory Affairs"
+        },
+        {
+          priority: "LOW",
+          action: "Internal Compliance Training",
+          description: "Update staff on the latest FATF Travel Rule updates regarding cross-chain atomic swaps.",
+          assigned_to: "Human Resources"
         }
       ]
     }
@@ -472,16 +508,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       </section>
 
       {/* Tier 2: Statistical Intelligence */}
-      <section className="space-y-6">
+      <section className="space-y-8">
         <div className="flex items-center gap-6 px-4">
             <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
             <span className="text-[12px] font-black tracking-[0.5em] text-white uppercase drop-shadow-lg">Tier 2: Statistical Intelligence</span>
             <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-           {/* Sanctions Registry - 4 Columns */}
-           <div className="xl:col-span-4 bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl h-[700px]">
+        <div className="flex flex-col gap-8">
+           {/* Sanctions Registry - Full Width */}
+           <div className="w-full bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl h-[500px]">
               <div className="p-8 border-b border-white/5 bg-black/20 flex items-center justify-between">
                  <div className="flex items-center gap-4">
                     <div className="p-3 bg-rose-500/10 text-rose-400 rounded-xl">
@@ -493,9 +529,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                     </div>
                  </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-black/10">
+              <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 custom-scrollbar bg-black/10">
                  {isLoading ? (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-4">
+                    <div className="col-span-full h-full flex flex-col items-center justify-center text-slate-500 gap-4">
                        <Loader2 size={32} className="animate-spin opacity-20" />
                        <span className="text-[10px] font-black uppercase tracking-widest">Decrypting Registry...</span>
                     </div>
@@ -505,8 +541,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
               </div>
            </div>
 
-           {/* Market Assets - 8 Columns */}
-           <div className="xl:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8 h-[700px]">
+           {/* Market Assets - Side by Side below Registry */}
+           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 min-h-[600px]">
               {/* Crypto Coin */}
               <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 overflow-hidden flex flex-col shadow-2xl">
                  <div className="p-8 border-b border-white/5 bg-black/20 flex items-center justify-between">
@@ -639,12 +675,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                       {latestForecast.intelligence?.recommendations?.map((rec, i) => (
                           <div key={i} className="bg-black/40 rounded-[35px] p-10 border border-white/5 hover:border-amber-500/30 transition-all shadow-2xl relative group overflow-hidden">
                               <div className={`absolute top-0 right-0 w-1.5 h-full transition-colors ${
-                                 rec.priority === 'HIGH' ? 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.5)]' : 'bg-amber-500/50'
+                                 rec.priority === 'HIGH' ? 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.5)]' : 
+                                 rec.priority === 'MEDIUM' ? 'bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.5)]' :
+                                 'bg-slate-500 shadow-[0_0_20px_rgba(100,116,139,0.5)]'
                               }`}></div>
                               <div className="flex items-center justify-between mb-6">
                                 <h4 className="font-black text-slate-100 uppercase text-sm tracking-[0.3em]">{rec.action}</h4>
                                 <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-lg border ${
-                                    rec.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-white/5 text-slate-400 border-white/10'
+                                    rec.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 
+                                    rec.priority === 'MEDIUM' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                    'bg-white/5 text-slate-400 border-white/10'
                                 }`}>{rec.priority} Priority</span>
                               </div>
                               <p className="text-slate-400 text-base leading-relaxed font-medium mb-10 opacity-80">{rec.description}</p>
