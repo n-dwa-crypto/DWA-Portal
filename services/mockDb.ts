@@ -1,17 +1,41 @@
 import { DbRecord, RecordType, ConnectionStatus, SystemStats } from '../types';
 
-const INITIAL_NEWS = `Trump coin price plunges 94% in a year as memecoin frenzy fades. Token falls sharply from its peak just before US president’s inauguration in January 2025. Despite the fall in price, $TRUMP remains the fifth-biggest memecoin by market capitalisation.
+const BOOTSTRAP_ITEMS = [
+  {
+    id: 'news-fiscal-uncertainty-2025',
+    type: RecordType.NEWS,
+    content: `Market Stress from US fiscal uncertainty weighs on crypto — BTC sliding
+• Bitcoin and broader digital assets are slipping sharply amid macro and political uncertainty in the U.S., even as lawmakers close in on avoiding a government shutdown.  
+• This kind of risk-off sentiment drives liquidations in crypto futures and worsens volatility, as markets repricing expectations for Fed policy, liquidity, and risk assets.  
+
+Why it matters (impact vector):
+• Macro/geopolitical risk is increasingly transmitted into crypto price action, undermining narratives that digital assets are decoupled from traditional markets.
+• Short-term traders de-risk; longer-term holders may reassess BTC/ETH valuations and institutional participation.`
+  },
+  {
+    id: 'news-illicit-activity-2025',
+    type: RecordType.NEWS,
+    content: `Global illicit crypto activity surges — $82B+ money laundering footprint
+• Researchers report that **crypto money-laundering hit at least $82 billion in 2025, driven by sophisticated networks and cross-border concealment tactics.  
+• This surge continues despite enforcement actions, highlighting how digital assets are intertwined with geopolitical pressures, sanction evasion, and criminal finance.
+
+Why it matters (impact vector):
+• Regulatory risk spikes: lawmakers and regulators typically tighten oversight and compliance when illicit flows expand.
+• Heightened enforcement leads to higher KYC/AML costs, could chill institutional inflows, and may pressure stablecoin & exchange frameworks.`
+  },
+  {
+    id: 'bootstrap-news-trump-001',
+    type: RecordType.NEWS,
+    content: `Trump coin price plunges 94% in a year as memecoin frenzy fades. Token falls sharply from its peak just before US president’s inauguration in January 2025. Despite the fall in price, $TRUMP remains the fifth-biggest memecoin by market capitalisation.
 
 Donald Trump’s memecoin has plunged more than 90 per cent in price from its peak a year ago, in a sign of how the excitement around the US president’s controversial cryptocurrency has evaporated. Launched ahead of Trump’s inauguration in January last year, the $TRUMP memecoin briefly surged from $1.20 to a high of $75.35, according to CoinMarketCap data. One year on, it is trading at $4.86, a 94 per cent decline from that peak.
 
-A couple of days after the $TRUMP coin was launched, his wife Melania Trump also debuted a memecoin. The price of that jumped to a high of $13.73 but is now trading slightly below $0.15, according to CoinMarketCap data, a fall of 99 per cent from its peak. The sharp falls in price leave investors who bought at the peak nursing heavy losses. The Trumps’ crypto activities have generated more than $1bn in pre-tax profits, a recent investigation found.
-
-Investor enthusiasm for memecoins reached fever pitch in late 2023 and early 2024. The volatile tokens have no fundamental value or business model. Despite the fall in price, $TRUMP remains the fifth-biggest memecoin by market capitalisation. The president and his wife’s memecoins have been heavily criticised by crypto industry figures for being a moneymaking mechanism.
-
-The Trump companies have meanwhile moved on to other things. Trump Media & Technology Group, which runs the Truth Social platform, is planning to issue a new crypto token to shareholders on February 2, as part of a deal with exchange Crypto.com.`;
+A couple of days after the $TRUMP coin was launched, his wife Melania Trump also debuted a memecoin. The price of that jumped to a high of $13.73 but is now trading slightly below $0.15, according to CoinMarketCap data, a fall of 99 per cent from its peak. The sharp falls in price leave investors who bought at the peak nursing heavy losses. The Trumps’ crypto activities have generated more than $1bn in pre-tax profits, a recent investigation found.`
+  }
+];
 
 class MockDbService {
-  private readonly STORAGE_KEY = 'dwa_admin_db_v3'; // Incremented version to force update with new news
+  private readonly STORAGE_KEY = 'dwa_admin_db_v4'; 
   private connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED;
   private listeners: ((status: ConnectionStatus) => void)[] = [];
 
@@ -23,14 +47,13 @@ class MockDbService {
   private initBootstrap() {
     const records = this.getRecords();
     if (records.length === 0) {
-      const bootstrapRecord: DbRecord = {
-        id: 'bootstrap-news-trump-001',
-        type: RecordType.NEWS,
-        content: INITIAL_NEWS,
-        timestamp: Date.now(),
+      const now = Date.now();
+      const bootstrapRecords: DbRecord[] = BOOTSTRAP_ITEMS.map((item, index) => ({
+        ...item,
+        timestamp: now - (index * 1000), // Spaced by 1s to maintain order at the top
         synced: true
-      };
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify([bootstrapRecord]));
+      }));
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bootstrapRecords));
     }
   }
 
@@ -77,6 +100,15 @@ class MockDbService {
         resolve(newRecord);
       }, 300);
     });
+  }
+
+  public async promoteRecord(id: string): Promise<void> {
+    const records = this.getRecords();
+    const index = records.findIndex(r => r.id === id);
+    if (index > -1) {
+      records[index].timestamp = Date.now();
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(records));
+    }
   }
 
   public async fetchRecords(type?: RecordType): Promise<DbRecord[]> {

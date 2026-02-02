@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { dbService } from './services/mockDb';
 import { supabaseService, CloudRecord, DbHealthStatus } from './services/supabase';
@@ -121,6 +120,11 @@ const App: React.FC = () => {
       setIsLoadingFeed(false);
     }
   }, [checkDbReady]);
+
+  const handlePromoteRecord = async (id: string) => {
+    await dbService.promoteRecord(id);
+    await refreshData();
+  };
 
   const generateIntelligence = async (content: string): Promise<IntelligenceData | null> => {
     const apiKey = userApiKey || (typeof process !== 'undefined' ? process.env.API_KEY : '');
@@ -260,6 +264,15 @@ CREATE POLICY "Allow admin write" ON dwa_records FOR INSERT WITH CHECK (true);`;
     return () => unsubscribe();
   }, [refreshData]);
 
+  useEffect(() => {
+    const autoRefreshInterval = setInterval(() => {
+      if (connectionStatus === ConnectionStatus.CONNECTED) {
+        refreshData();
+      }
+    }, 60000);
+    return () => clearInterval(autoRefreshInterval);
+  }, [connectionStatus, refreshData]);
+
   const LogoImage = () => (
     <img 
       src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=146,fit=crop/mP4MZ3DvE9fbN33K/dwa-logo---original-size-AGBbqzN3p1TJKPJO.png"
@@ -300,20 +313,6 @@ CREATE POLICY "Allow admin write" ON dwa_records FOR INSERT WITH CHECK (true);`;
         </div>
         
         <div className="p-6 space-y-3">
-           <button onClick={toggleAdmin} className="w-full bg-white/5 hover:bg-white/10 rounded-2xl p-4 border border-white/10 transition-all flex items-center justify-between group">
-              <div className="flex flex-col items-start text-left">
-                 <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                    <ShieldCheck size={12} className={isAdmin ? "text-emerald-400" : "text-slate-600"} /> System Role
-                 </div>
-                 <span className={`text-[10px] font-bold uppercase ${isAdmin ? "text-emerald-400" : "text-slate-400"}`}>
-                   {isAdmin ? 'Admin View On' : 'Visitor View'}
-                 </span>
-              </div>
-              <div className={`p-2 rounded-lg ${isAdmin ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-600'}`}>
-                {isAdmin ? <ShieldCheck size={14} /> : <ShieldOff size={14} />}
-              </div>
-           </button>
-
            <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                  <Cpu size={12} /> System Status
@@ -348,11 +347,10 @@ CREATE POLICY "Allow admin write" ON dwa_records FOR INSERT WITH CHECK (true);`;
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-10 scroll-smooth custom-scrollbar">
-          {activeTab === 'dashboard' && <Dashboard userRecords={records} userApiKey={userApiKey} />}
+          {activeTab === 'dashboard' && <Dashboard userRecords={records} userApiKey={userApiKey} onPromoteRecord={handlePromoteRecord} />}
 
           {activeTab === 'portal' && isAdmin && (
             <div className="max-w-7xl mx-auto space-y-10 pb-20">
-              {/* Unified Node Status Bar */}
               <div className={`rounded-[40px] p-1 border transition-all duration-700 ${dbHealth === 'ready' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20 shadow-[0_0_50px_rgba(244,63,94,0.1)]'}`}>
                 <div className="bg-black/60 backdrop-blur-3xl p-10 rounded-[38px] flex flex-col lg:flex-row gap-10 items-start">
                     <div className="lg:w-1/3">
@@ -421,7 +419,6 @@ CREATE POLICY "Admin Write" ON dwa_records FOR INSERT WITH CHECK (true);`}
                 </div>
               </div>
 
-              {/* API Keys Configuration */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white/5 backdrop-blur-3xl rounded-[40px] border border-white/10 p-1 shadow-2xl overflow-hidden group hover:border-blue-500/30 transition-all">
                   <div className="bg-black/40 p-10 rounded-[38px] h-full flex flex-col">
@@ -488,7 +485,6 @@ CREATE POLICY "Admin Write" ON dwa_records FOR INSERT WITH CHECK (true);`}
                 </div>
               </div>
 
-              {/* Action Widgets Grid - NEWS, SANCTION, THANK_YOU */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <ActionWidget 
                   type={RecordType.NEWS}

@@ -29,46 +29,127 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { DbRecord, RecordType } from '../types';
 import { supabaseService } from '../services/supabase';
 
-const INTEL_CACHE_KEY = 'dwa_intelligence_cache_v3';
+// --- INTELLIGENCE LIBRARY (Pre-defined for cycling) ---
 
-// --- PRE-POPULATED INTELLIGENCE DATA FOR BOOTSTRAP NEWS ---
-const BOOTSTRAP_INTEL: IntelligenceData = {
-  correlations: [
-    {
-      entity_name: "Trump Family Ecosystem ($TRUMP/$MELANIA)",
-      correlation_type: "Speculative Volatility Contagion",
-      confidence: "HIGH",
-      related_cryptos: [
-        { symbol: "TRUMP", name: "MAGA Memecoin", correlation_strength: 0.98 },
-        { symbol: "MELANIA", name: "Melania Memecoin", correlation_strength: 0.94 }
-      ],
-      risk_level: "HIGH"
-    },
-    {
-      entity_name: "Trump Media & Technology Group (TMTG)",
-      correlation_type: "Operational Diversification Risk",
-      confidence: "MEDIUM",
-      related_cryptos: [
-        { symbol: "HYPE", name: "Hyperliquid", correlation_strength: 0.45 },
-        { symbol: "BTC", name: "Bitcoin", correlation_strength: 0.32 }
-      ],
-      risk_level: "MEDIUM"
-    }
-  ],
-  intelligence: {
-    total_correlations: 2,
-    high_risk: 1,
-    medium_risk: 1,
-    recommendations: [
+const INTEL_LIBRARY: IntelligenceData[] = [
+  {
+    correlations: [
       {
-        priority: "HIGH",
-        action: "Volatility Safeguard",
-        description: "Initiate liquidity monitoring for $TRUMP holders ahead of the token distribution.",
-        assigned_to: "Market Risk Division"
+        entity_name: "Trump Family Ecosystem ($TRUMP/$MELANIA)",
+        correlation_type: "Speculative Volatility Contagion",
+        confidence: "HIGH",
+        related_cryptos: [
+          { symbol: "TRUMP", name: "MAGA Memecoin", correlation_strength: 0.98 },
+          { symbol: "MELANIA", name: "Melania Memecoin", correlation_strength: 0.94 }
+        ],
+        risk_level: "HIGH"
+      },
+      {
+        entity_name: "Trump Media & Technology Group (TMTG)",
+        correlation_type: "Operational Diversification Risk",
+        confidence: "MEDIUM",
+        related_cryptos: [
+          { symbol: "HYPE", name: "Hyperliquid", correlation_strength: 0.45 },
+          { symbol: "BTC", name: "Bitcoin", correlation_strength: 0.32 }
+        ],
+        risk_level: "MEDIUM"
       }
-    ]
+    ],
+    intelligence: {
+      total_correlations: 2,
+      high_risk: 1,
+      medium_risk: 1,
+      recommendations: [
+        {
+          priority: "HIGH",
+          action: "Volatility Safeguard",
+          description: "Initiate liquidity monitoring for $TRUMP holders ahead of the token distribution.",
+          assigned_to: "Market Risk Division"
+        }
+      ]
+    }
+  },
+  {
+    correlations: [
+      {
+        entity_name: "U.S. Treasury / Fed Policy",
+        correlation_type: "Macro Liquidity Transmission",
+        confidence: "HIGH",
+        related_cryptos: [
+          { symbol: "BTC", name: "Bitcoin", correlation_strength: 0.92 },
+          { symbol: "ETH", name: "Ethereum", correlation_strength: 0.85 }
+        ],
+        risk_level: "HIGH"
+      },
+      {
+        entity_name: "Risk-Off Market Sentiment",
+        correlation_type: "Capital Flight Correlation",
+        confidence: "HIGH",
+        related_cryptos: [
+          { symbol: "SOL", name: "Solana", correlation_strength: 0.78 },
+          { symbol: "NEAR", name: "NEAR Protocol", correlation_strength: 0.65 }
+        ],
+        risk_level: "MEDIUM"
+      }
+    ],
+    intelligence: {
+      total_correlations: 2,
+      high_risk: 1,
+      medium_risk: 1,
+      recommendations: [
+        {
+          priority: "HIGH",
+          action: "De-Risk Exposure",
+          description: "Temporary reduction in altcoin leverage is advised during US fiscal deadlock phases.",
+          assigned_to: "Macro Strategy Dept"
+        }
+      ]
+    }
+  },
+  {
+    correlations: [
+      {
+        entity_name: "Global AML/KYC Regulatory Frameworks",
+        correlation_type: "Compliance Enforcement Risk",
+        confidence: "VERY HIGH",
+        related_cryptos: [
+          { symbol: "USDT", name: "Tether", correlation_strength: 0.88 },
+          { symbol: "USDC", name: "USD Coin", correlation_strength: 0.82 }
+        ],
+        risk_level: "HIGH"
+      },
+      {
+        entity_name: "Offshore Exchange Ecosystems",
+        correlation_type: "Operational Jurisdictional Risk",
+        confidence: "MEDIUM",
+        related_cryptos: [
+          { symbol: "BNB", name: "BNB", correlation_strength: 0.74 },
+          { symbol: "XMR", name: "Monero", correlation_strength: 0.95 }
+        ],
+        risk_level: "HIGH"
+      }
+    ],
+    intelligence: {
+      total_correlations: 2,
+      high_risk: 2,
+      medium_risk: 0,
+      recommendations: [
+        {
+          priority: "HIGH",
+          action: "Audit Protocol Scan",
+          description: "Increase monitoring on cross-border stablecoin flows exceeding $100k for potential laundered signatures.",
+          assigned_to: "Financial Crimes Unit"
+        }
+      ]
+    }
   }
-};
+];
+
+const CYCLE_IDS = [
+    'bootstrap-news-trump-001',
+    'news-fiscal-uncertainty-2025',
+    'news-illicit-activity-2025'
+];
 
 let regionNames: any = null;
 try {
@@ -174,9 +255,10 @@ const SanctionRow: React.FC<SanctionRowProps> = ({ item }) => {
 interface DashboardProps {
   userRecords?: DbRecord[];
   userApiKey?: string;
+  onPromoteRecord?: (id: string) => Promise<void>;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiKey }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiKey, onPromoteRecord }) => {
   const [sanctions, setSanctions] = useState<any[]>([]);
   const [cryptoStable, setCryptoStable] = useState<any[]>([]);
   const [cryptoAlt, setCryptoAlt] = useState<any[]>([]);
@@ -184,6 +266,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
   
   const [latestForecast, setLatestForecast] = useState<IntelligenceData | null>(null);
   const [forecastStatus, setForecastStatus] = useState<AIStatus>('connecting');
+  const [cycleIndex, setCycleIndex] = useState(0);
+
+  // Ref to track manual mode to prevent initial useEffect from overriding the cycle
+  const manualCycleMode = useRef(false);
 
   const sanitizeApiKey = (key: any): string => {
     if (!key) return '';
@@ -198,31 +284,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
     return sanitizeApiKey(envKey);
   }, [userApiKey]);
 
-  const loadLatestIntelligence = useCallback(async (content?: string, recordId?: string, force = false) => {
+  const loadLatestIntelligence = useCallback(async (content?: string, recordId?: string, isManualCycle = false) => {
     try {
-      const cloudRecord = await supabaseService.getLatestIntelligence();
-      if (cloudRecord && cloudRecord.intelligence) {
-        setLatestForecast(cloudRecord.intelligence);
-        setForecastStatus('cloud');
-        return;
+      // 1. Check cloud first (only if not manually cycling)
+      if (!isManualCycle && !manualCycleMode.current) {
+        const cloudRecord = await supabaseService.getLatestIntelligence();
+        if (cloudRecord && cloudRecord.intelligence) {
+          setLatestForecast(cloudRecord.intelligence);
+          setForecastStatus('cloud');
+          return;
+        }
       }
 
-      if (recordId === 'bootstrap-news-trump-001' && !force) {
-        setLatestForecast(BOOTSTRAP_INTEL);
-        setForecastStatus('heuristic');
+      // 2. Logic to determine target heuristic set
+      if (isManualCycle && onPromoteRecord) {
+        manualCycleMode.current = true;
+        const nextIndex = (cycleIndex + 1) % CYCLE_IDS.length;
+        const nextId = CYCLE_IDS[nextIndex];
+        // Promoting the record will trigger a global state update via App.tsx
+        // which will eventually call this function again with the promoted recordId
+        await onPromoteRecord(nextId);
         return;
+      } else {
+        // Only run this if not in manual mode or if strictly requested
+        let target = 0;
+        if (recordId === 'news-fiscal-uncertainty-2025') target = 1;
+        else if (recordId === 'news-illicit-activity-2025') target = 2;
+        
+        setCycleIndex(target);
+        setLatestForecast(INTEL_LIBRARY[target]);
       }
 
-      const apiKey = getEffectiveApiKey();
-      if (!apiKey) {
-        setForecastStatus('heuristic');
-        return;
-      }
+      setForecastStatus('heuristic');
+
     } catch (e) {
-      console.warn("Cloud intel sync failed:", e);
+      console.warn("Intelligence fetch error:", e);
+      setLatestForecast(INTEL_LIBRARY[0]);
       setForecastStatus('heuristic');
     }
-  }, [getEffectiveApiKey]);
+  }, [cycleIndex, onPromoteRecord]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -248,7 +348,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
         setCryptoStable(stableData);
         setCryptoAlt(altData);
         
-        await loadLatestIntelligence();
+        // Find the absolute latest news item to sync heuristics
+        const latestNews = userRecords?.find(r => r.type === RecordType.NEWS);
+        await loadLatestIntelligence(latestNews?.content, latestNews?.id);
       } catch (err) {
         console.warn("Static data fetch failed:", err);
       } finally {
@@ -256,6 +358,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
       }
     };
     fetchData();
+  }, [loadLatestIntelligence, userRecords]);
+
+  // Tier 3: Heuristic Feedback auto-refresh every 60 seconds
+  useEffect(() => {
+    const autoCycle = setInterval(() => {
+      loadLatestIntelligence(undefined, undefined, true);
+    }, 60000); // 60 seconds
+    
+    return () => clearInterval(autoCycle);
   }, [loadLatestIntelligence]);
 
   const allCrypto = useMemo(() => [...cryptoStable, ...cryptoAlt], [cryptoStable, cryptoAlt]);
@@ -326,7 +437,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
           <div className="relative rounded-[45px] overflow-hidden p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-white/5 shadow-2xl">
              <div className="absolute inset-0 bg-black/60 backdrop-blur-3xl"></div>
              <div className="relative z-10 p-10 h-full flex flex-col lg:flex-row gap-10">
-                <div className="lg:w-1/2 flex flex-col justify-between">
+                <div className="lg:w-1/2 flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-4 mb-10">
                        <div className="p-4 rounded-2xl bg-cyan-500/20 text-cyan-300 ring-1 ring-white/10">
@@ -463,13 +574,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                   ) : (
                     <div className="flex items-center gap-3 px-8 py-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
                        <BrainCircuit size={24} className="text-amber-400" />
-                       <span className="text-xs font-black text-amber-200 uppercase tracking-[0.3em]">Heuristic Fallback</span>
+                       <span className="text-xs font-black text-amber-200 uppercase tracking-[0.3em]">Heuristic Feedback</span>
                     </div>
                   )}
               </div>
 
               <button 
-                onClick={() => loadLatestIntelligence()}
+                onClick={() => loadLatestIntelligence(undefined, undefined, true)}
                 className="p-4 bg-white/5 border border-white/10 rounded-2xl text-white hover:bg-white/10 transition-all hover:scale-110 active:rotate-180 duration-500 shadow-2xl group"
               >
                 <RefreshCw size={22} className="group-hover:text-blue-400 transition-colors" />
@@ -550,6 +661,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userRecords = [], userApiK
                 </div>
             </div>
           )}
+
+          {/* Node Source ID Footer */}
+          <div className="mt-16 text-center">
+             <span className="text-[8px] font-mono text-white/5 uppercase tracking-[0.4em] select-none">
+               Active Node ID: {CYCLE_IDS[cycleIndex]}
+             </span>
+          </div>
         </div>
       </section>
     </div>
