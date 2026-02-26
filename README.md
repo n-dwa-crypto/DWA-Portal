@@ -2,6 +2,8 @@
 
 A professional-grade dashboard for managing crypto market intelligence and global sanction lists.
 
+URL - https://n-dwa-crypto.github.io/DWA-Portal/
+
 ## 🚀 Supabase Integration Setup
 
 To enable the Global Cloud Feed and Unified Audit Log, you must set up a Supabase project:
