@@ -1,26 +1,26 @@
 rank,symbol,name,price,change_24h
-11,BNB,BNB,651.28,1.14
-12,DOGE,Dogecoin,0.0954,5.14
-13,TRX,TRON,0.2843,0.32
-14,HYPE,Hyperliquid,31.68,-1.14
-15,LINK,Chainlink,18.75,3.80
-16,SUI,Sui,1.52,4.90
-17,LTC,Litecoin,88.40,2.10
-18,XMR,Monero,363.10,5.25
-19,UNI,Uniswap,8.12,3.55
-20,NEAR,NEAR Protocol,3.05,3.40
-21,AAVE,Aave,108.70,-0.95
-22,PEPE,Pepe,0.0000082,4.80
-23,BONK,Bonk,0.0000215,2.10
-24,GRT,The Graph,0.19,3.15
-25,JUP,Jupiter,0.88,6.10
-26,RENDER,Render,7.65,5.20
-27,STX,Stacks,2.61,4.40
-28,PYTH,Pyth Network,0.46,3.20
-29,TON,Toncoin,3.42,2.05
-30,MATIC,Polygon,0.93,2.60
-31,BCH,Bitcoin Cash,459.27,1.71
-32,STLR,Stellar,0.13,1.90
-33,HBAR,Hedera,0.11,2.30
-34,ARB,Arbitrum,1.73,3.95
-35,APT,Aptos,9.87,4.25
+11,BNB,BNB,646.90,-0.34
+12,DOGE,Dogecoin,0.0936,0.30
+13,TRX,TRON,0.2895,0.10
+14,HYPE,Hyperliquid,37.16,1.30
+15,LINK,Chainlink,18.40,-0.20
+16,SUI,Sui,1.49,-1.10
+17,LTC,Litecoin,86.75,-0.80
+18,XMR,Monero,356.40,-0.60
+19,UNI,Uniswap,7.95,-0.90
+20,NEAR,NEAR Protocol,2.96,-1.20
+21,AAVE,Aave,105.20,-1.40
+22,PEPE,Pepe,0.0000081,-1.50
+23,BONK,Bonk,0.0000210,-2.00
+24,GRT,The Graph,0.185,-1.30
+25,JUP,Jupiter,0.86,-2.10
+26,RENDER,Render,7.42,-2.40
+27,STX,Stacks,2.53,-1.70
+28,PYTH,Pyth Network,0.44,-1.80
+29,TON,Toncoin,3.33,-1.50
+30,MATIC,Polygon,0.89,-2.10
+31,BCH,Bitcoin Cash,445.60,-1.20
+32,STLR,Stellar,0.127,-1.00
+33,HBAR,Hedera,0.108,-1.30
+34,ARB,Arbitrum,1.65,-2.20
+35,APT,Aptos,9.45,-1.80
