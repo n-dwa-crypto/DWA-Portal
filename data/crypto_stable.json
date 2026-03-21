@@ -3,57 +3,57 @@
     "rank": 1,
     "symbol": "BTC",
     "name": "Bitcoin",
-    "price": 70435,
-    "change_24h": 0.35
+    "price": 70750,
+    "change_24h": -0.26
   },
   {
     "rank": 2,
     "symbol": "ETH",
     "name": "Ethereum",
-    "price": 2047.51,
-    "change_24h": -0.45
+    "price": 2155.5,
+    "change_24h": -0.06
   },
   {
     "rank": 3,
     "symbol": "SOL",
     "name": "Solana",
-    "price": 86.93,
-    "change_24h": -1.2
+    "price": 149.2,
+    "change_24h": -1.37
   },
   {
     "rank": 4,
     "symbol": "XRP",
     "name": "XRP",
-    "price": 1.38,
-    "change_24h": 0.18
+    "price": 1.45,
+    "change_24h": -0.67
   },
   {
     "rank": 5,
     "symbol": "ADA",
     "name": "Cardano",
-    "price": 0.26,
-    "change_24h": -0.7
+    "price": 0.72,
+    "change_24h": -0.9
   },
   {
     "rank": 6,
     "symbol": "AVAX",
     "name": "Avalanche",
-    "price": 34.95,
-    "change_24h": -1.1
+    "price": 37.1,
+    "change_24h": -0.86
   },
   {
     "rank": 7,
     "symbol": "DOT",
     "name": "Polkadot",
-    "price": 7.52,
-    "change_24h": -0.8
+    "price": 8.1,
+    "change_24h": -0.95
   },
   {
     "rank": 8,
     "symbol": "QNT",
     "name": "Quant",
-    "price": 105.9,
-    "change_24h": -0.6
+    "price": 108.5,
+    "change_24h": -0.75
   },
   {
     "rank": 9,
@@ -67,6 +67,6 @@
     "symbol": "USDT",
     "name": "Tether",
     "price": 1,
-    "change_24h": 0
+    "change_24h": -0.01
   }
 ]
